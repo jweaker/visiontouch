@@ -4,7 +4,7 @@ Digital Image Processing, course project report.
 Team: [Member 1], [Member 2], [Member 3], [Member 4], [Member 5].
 
 <!-- BEGIN generated -->
-_Numbers generated 2026-11-20 00:56 from `runs/figures/results.json` and the rig reports by `eval/fill_report.py`._
+_Numbers generated 2026-11-20 01:05 from `runs/figures/results.json` and the rig reports by `eval/fill_report.py`._
 <!-- END generated -->
 
 ## Summary
@@ -12,11 +12,11 @@ _Numbers generated 2026-11-20 00:56 from `runs/figures/results.json` and the rig
 VisionTouch turns an ordinary projector and an ordinary camera (a laptop webcam or a phone) into a touch surface. The camera watches the projected picture. Because the computer knows what it is projecting, it can predict what the camera should see; whatever differs is a hand or its shadow. From that difference we find the fingertip, read the hand's pose, and send touches to our own apps or to the computer's mouse.
 
 <!-- BEGIN headline -->
-- **Webcam camera, recorded dataset (synthetic hands):** 6.1 % of clean pixels wrongly flagged (plain subtraction: 91.2 %); hand found in 88 % of frames; median fingertip error 11.9 px (0.62 % of the screen width).
-- **Phone camera, recorded dataset (synthetic hands):** 3.7 % of clean pixels wrongly flagged (plain subtraction: 97.5 %); hand found in 89 % of frames; median fingertip error 10.1 px (0.52 % of the screen width).
-- **Live rig, Webcam:** false-alarm frames on clean pictures at most 0 %; median pointer error within 20 px in 14 of 16 picture-and-hand cases; worst 722 px on `text`.
-- **Live rig, Webcam, washed-out picture:** false-alarm frames on clean pictures at most 0 %; median pointer error within 20 px in 10 of 13 picture-and-hand cases; worst 280 px on `text`.
-- **Live rig, Phone:** false-alarm frames on clean pictures at most 0 %; median pointer error within 20 px in 13 of 16 picture-and-hand cases; worst 1001 px on `text`.
+- **Webcam, recorded dataset (synthetic hands):** 6.1 % of clean pixels wrongly flagged (plain subtraction: 91.2 %); hand found in 88 % of frames; median fingertip error 11.9 px (0.62 % of the screen width).
+- **Phone, recorded dataset (synthetic hands):** 3.7 % of clean pixels wrongly flagged (plain subtraction: 97.5 %); hand found in 89 % of frames; median fingertip error 10.1 px (0.52 % of the screen width).
+- **Live rig, Webcam:** no false hand on the clean pictures; median pointer error within 20 px in 15 of 16 picture-and-hand cases; worst 973 px on `text`.
+- **Live rig, Webcam, washed-out picture:** no false hand on the clean pictures; median pointer error within 20 px in 10 of 13 picture-and-hand cases; worst 280 px on `text`.
+- **Live rig, Phone:** no false hand on the clean pictures; median pointer error within 20 px in 13 of 16 picture-and-hand cases; worst 1000 px on `text`.
 - **Keystone (webcam):** edge tilt 5.1° before, 0.08° after; aspect 1.67 → 1.78 (target 1.78).
 - **Real hands:** not yet measured.
 <!-- END headline -->
@@ -78,9 +78,9 @@ The predictor's tuning knobs were adjusted during development on part of `ds1`, 
 
 ```mermaid
 flowchart TB
-    subgraph Calibration [Calibration, once, about 5 s]
+    subgraph Calibration [Calibration, about 10 s, repeated if the camera moves]
         C1[Project ArUco marker grid] --> C2[Homography camera to screen<br/>RANSAC]
-        C3[Project 4 colour mosaics] --> C4[Colour map:<br/>cubic polynomial per channel]
+        C3[Project 4 colour mosaics,<br/>paired with screenshots] --> C4[Colour map:<br/>cubic polynomial per channel]
         C5[Flash black, then white] --> C6[Camera + projector delay]
         C7[Project white] --> C8[Find screen frame<br/>keystone correction]
     end
@@ -284,21 +284,21 @@ The offline counts are per single frame, before the tracker's three-frame confir
 
 ### 4.4 Live rig
 
-The engine calibrates itself, then the test projects each picture. First the clean picture with real screen capture, to count false alarms. Then synthetic shadows and lit hands at three random places, while the engine is told that the screen shows the clean picture. The pointer the engine reports (after tracking) is compared with the known fingertip.
+The engine calibrates itself, then the test projects each picture. First the clean picture with real screen capture, to count false alarms. Then synthetic shadows and lit hands at three random places, while the engine is told that the screen shows the clean picture. The pointer the engine reports (after tracking) is compared with the known fingertip. Runs marked *washed-out picture* imitate a weak projector in a lit room: the whole stage, calibration included, is shown with reduced contrast and brightness, giving grey blacks and dim whites (`eval/live_test.py --washed`).
 
 ![Live rig](figures/live.png)
 
 <!-- BEGIN live -->
 | Camera | Picture | Clean: frames with a false hand | Shadow: frames with a pointer, median error | Lit hand: same |
 |---|---|---|---|---|
-| Webcam | white | 0 % | 91 %, 6 px | 92 %, 10 px |
-| Webcam | pastel | 0 % | 90 %, 1 px | 91 %, 7 px |
-| Webcam | light | 0 % | 91 %, 3 px | 91 %, 3 px |
-| Webcam | board | 0 % | 90 %, 7 px | 90 %, 9 px |
-| Webcam | balloons | 0 % | 90 %, 2 px | 91 %, 4 px |
-| Webcam | slide_light | 0 % | 91 %, 4 px | 89 %, 7 px |
-| Webcam | text | 0 % | 61 %, 108 px | 29 %, 722 px |
-| Webcam | mid | 0 % | 90 %, 15 px | 90 %, 7 px |
+| Webcam | white | 0 % | 92 %, 5 px | 92 %, 13 px |
+| Webcam | pastel | 0 % | 91 %, 9 px | 92 %, 6 px |
+| Webcam | light | 0 % | 91 %, 4 px | 92 %, 4 px |
+| Webcam | board | 0 % | 92 %, 8 px | 92 %, 10 px |
+| Webcam | balloons | 0 % | 91 %, 2 px | 91 %, 2 px |
+| Webcam | slide_light | 0 % | 89 %, 3 px | 90 %, 8 px |
+| Webcam | text | 0 % | 60 %, 5 px | 30 %, 973 px |
+| Webcam | mid | 0 % | 84 %, 4 px | 87 %, 5 px |
 | Webcam, washed-out picture | white | 0 % | 90 %, 154 px | 0 %, – |
 | Webcam, washed-out picture | pastel | 0 % | 90 %, 2 px | 30 %, 15 px |
 | Webcam, washed-out picture | light | 0 % | 91 %, 1 px | 89 %, 2 px |
@@ -307,14 +307,14 @@ The engine calibrates itself, then the test projects each picture. First the cle
 | Webcam, washed-out picture | slide_light | 0 % | 91 %, 11 px | 0 %, – |
 | Webcam, washed-out picture | text | 0 % | 62 %, 280 px | 0 %, – |
 | Webcam, washed-out picture | mid | 0 % | 90 %, 23 px | 92 %, 3 px |
-| Phone | white | 0 % | 90 %, 5 px | 91 %, 9 px |
-| Phone | pastel | 0 % | 90 %, 3 px | 90 %, 4 px |
-| Phone | light | 0 % | 91 %, 6 px | 90 %, 6 px |
-| Phone | board | 0 % | 91 %, 12 px | 90 %, 11 px |
-| Phone | balloons | 0 % | 91 %, 4 px | 91 %, 3 px |
-| Phone | slide_light | 0 % | 91 %, 4 px | 91 %, 9 px |
-| Phone | text | 0 % | 61 %, 207 px | 31 %, 1001 px |
-| Phone | mid | 0 % | 84 %, 354 px | 91 %, 3 px |
+| Phone | white | 0 % | 84 %, 6 px | 80 %, 9 px |
+| Phone | pastel | 0 % | 80 %, 3 px | 90 %, 2 px |
+| Phone | light | 0 % | 90 %, 8 px | 90 %, 6 px |
+| Phone | board | 0 % | 90 %, 11 px | 89 %, 9 px |
+| Phone | balloons | 0 % | 91 %, 6 px | 91 %, 5 px |
+| Phone | slide_light | 0 % | 90 %, 4 px | 84 %, 10 px |
+| Phone | text | 0 % | 61 %, 211 px | 30 %, 1000 px |
+| Phone | mid | 0 % | 91 %, 359 px | 91 %, 5 px |
 <!-- END live -->
 
 A second false-alarm test opened every app with nobody in front of the screen:
@@ -336,6 +336,8 @@ A second false-alarm test opened every app with nobody in front of the screen:
 | settings | 0 / 121 | 0 / 119 |
 <!-- END idle -->
 
+The live tests count pointers after the tracker, which reports a hand only after three detections in a row; the offline numbers in 4.1 to 4.3 count single frames.
+
 ### 4.5 Speed
 
 ![Latency](figures/latency.png)
@@ -343,9 +345,9 @@ A second false-alarm test opened every app with nobody in front of the screen:
 <!-- BEGIN latency -->
 | Camera | Camera + projector delay (calibration) | Engine step, live (median) | Residual only, offline (median) |
 |---|---|---|---|
-| Webcam | 156 ms | 41 ms | 21 ms |
+| Webcam | 160 ms | 39 ms | 31 ms |
 | Webcam, washed-out picture | 219 ms | 38 ms | – |
-| Phone | 213 ms | 41 ms | 24 ms |
+| Phone | 229 ms | 46 ms | 27 ms |
 <!-- END latency -->
 
 The largest share of the delay is the camera and projector, measured at calibration by flashing the screen and timing when the change appears in the screenshots and in the camera. The tracker predicts 60 ms ahead to hide part of it.
@@ -394,7 +396,7 @@ MediaPipe almost never fires on the synthetic hands, which is expected: they are
 - Works in front of changing content, because it predicts the background from the screenshot instead of storing it.
 - Robust to the camera changing its exposure, and to the rainbow banding of single-chip projectors (section 4.1).
 - On plain colours, drawings, games and light slides: few false pixels and small median fingertip errors (table in 4.3).
-- Calibration, delay measurement and keystone correction are automatic and take a few seconds.
+- Calibration, delay measurement and keystone correction are automatic, take about ten seconds, and repeat by themselves when the camera or projector is knocked.
 
 **Weaknesses.**
 

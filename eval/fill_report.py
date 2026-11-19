@@ -42,7 +42,7 @@ def blocks(results, rig, real):
     lines = []
     for cam, r in cams.items():
         a, f = r["ablation"][full], r["fingertip"]
-        lines.append(f"- **{CAM[cam]} camera, recorded dataset (synthetic hands):** {p(a['clean_mask_fp'])} of clean pixels wrongly flagged "
+        lines.append(f"- **{CAM[cam]}, recorded dataset (synthetic hands):** {p(a['clean_mask_fp'])} of clean pixels wrongly flagged "
                      f"(plain subtraction: {p(r['ablation'][results['variants'][0]]['clean_mask_fp'])}); hand found in {p(f['found_rate'], 0)} of frames; "
                      f"median fingertip error {n(f['median_px'])} px ({n(f['median_pct_width'], 2)} % of the screen width).")
     for cam, report in rig["live"].items():
@@ -51,7 +51,7 @@ def blocks(results, rig, real):
         cases = [(r[k]["median_error_px"], r["picture"]) for r in rows for k in ("shadow", "hand") if r[k]["median_error_px"] is not None]
         good = sum(e <= 20 for e, _ in cases)
         worst = max(cases)
-        lines.append(f"- **Live rig, {report['label']}:** false-alarm frames on clean pictures at most {p(alarms, 0)}; "
+        lines.append(f"- **Live rig, {report['label']}:** " + ("no false hand on the clean pictures" if alarms == 0 else f"a false hand in at most {p(alarms, 0)} of clean-picture frames") + "; "
                      f"median pointer error within 20 px in {good} of {len(cases)} picture-and-hand cases; worst {worst[0]:.0f} px on `{worst[1]}`.")
     k = rig["keystone"].get("0")
     if k:
@@ -172,7 +172,8 @@ def fill(path, values):
 
 def missing_figures(path):
     """Linked images that do not exist, relative to the document."""
-    links = re.findall(r"!\[[^\]]*\]\(([^)\s]+)\)", path.read_text())
+    text = re.sub(r"<!--.*?-->", "", path.read_text(), flags=re.S)  # placeholders in comments do not count
+    links = re.findall(r"!\[[^\]]*\]\(([^)\s]+)\)", text)
     return [link for link in links if not link.startswith("http") and not (path.parent / link).exists()]
 
 

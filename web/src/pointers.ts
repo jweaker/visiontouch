@@ -119,7 +119,8 @@ export function handlePointers(list: EnginePointer[], now = performance.now()) {
     t.ring.style.transform = `translate(${t.wx}px, ${t.wy}px)`
     if (Math.hypot(p.x - t.anchorX, p.y - t.anchorY) > DWELL_RADIUS)
       Object.assign(t, { anchorX: p.x, anchorY: p.y, anchorAt: now, armed: true })
-    let dwell = t.armed && t.hand.pose === 'point' && !p.down ? (now - t.anchorAt) / DWELL_MS : 0
+    // (also while down: in the engine's "hold" dwell mode the next hold releases the press)
+    let dwell = t.armed && t.hand.pose === 'point' ? (now - t.anchorAt) / DWELL_MS : 0
     if (dwell >= 1) {
       t.armed = false // the engine clicks now; the ring empties until the hand moves on
       dwell = 0

@@ -14,6 +14,7 @@ import numpy as np
 
 LOW, HIGH = 8, 18  # residual thresholds (grey levels): weak evidence, strong evidence
 MIN_AREA = 0.0015  # smallest blob, as a fraction of the working image
+GAP = 25  # pieces closer than this (working pixels) count as one blob
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"
 
 
@@ -36,8 +37,10 @@ def clean_mask(residual, sensitivity=1.0):
     for _ in range(4):  # grow back along thin parts, up to 12 px
         kept = cv2.dilate(kept, np.ones((7, 7), np.uint8)) & (raw | kept)
     kept = cv2.dilate(kept, np.ones((5, 5), np.uint8))
-    count, labels = cv2.connectedComponents(kept, connectivity=8)
-    return kept > 0, labels, np.arange(1, count)
+    # Pieces close to each other belong to one arm: where the picture is dark a
+    # hand or shadow leaves no trace, which would otherwise cut the arm in two.
+    count, groups = cv2.connectedComponents(cv2.dilate(kept, np.ones((GAP, GAP), np.uint8)), connectivity=8)
+    return kept > 0, np.where(kept > 0, groups, 0), np.arange(1, count)
 
 
 def find_tips(labels, blobs, inside):
@@ -114,6 +117,8 @@ if __name__ == "__main__":  # self-check on a synthetic arm
     mask, labels, blobs = clean_mask(residual)
     hands = find_tips(labels, blobs, inside)
     assert len(hands) == 1 and np.linalg.norm(hands[0]["tip"] - [300, 112]) < 12, hands
+    residual[190:205] = 0  # the arm crosses a dark stripe and disappears there: still one arm
+    assert np.linalg.norm(find_tips(*clean_mask(residual)[1:], inside)[0]["tip"] - [300, 112]) < 12
     assert not mask[10, 100]
     square = np.zeros((21, 2)); square[9] = [0, -100]; square[[6, 10, 14, 18]] = [0, -150]; square[[8, 12, 16, 20]] = [0, -230]; square[4] = [80, -60]
     assert read_pose(square)[0] == "palm"

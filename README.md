@@ -33,7 +33,7 @@ Ready-made desktop builds are described in [packaging/README.md](packaging/READM
 
 1. Place the camera so it sees the **whole projected picture**, with a little margin around it. Below or beside the projector works. A steep angle works but lowers accuracy.
 2. Keep the camera **still**. If it moves, calibrate again.
-3. Open **Settings** and press **Calibrate now**. The projector shows a grid of black-and-white markers, a few colour mosaics, and a black and a white flash. Stay out of the picture for about five seconds.
+3. Open **Settings** and press **Calibrate now**. The projector shows a grid of black-and-white markers, a few colour mosaics, and a black and a white flash. Stay out of the picture for about ten seconds. The engine also calibrates on first start and recalibrates by itself if the camera or projector is knocked.
 4. The status line reports the number of markers found, the alignment error and the camera delay. If calibration fails, the camera probably cannot see the whole picture.
 
 Calibration also straightens the picture automatically (keystone correction) if the camera can see the edge of the projection screen. You can switch this off in Settings.
@@ -68,6 +68,7 @@ Put the phone on a stand: it must not move after calibration.
 |---|---|
 | Point with one finger | Move the pointer. |
 | Hold the finger still (about 0.8 s) | Click. |
+| In drawing apps: hold still, move, hold still again | Draw a stroke without pinching. |
 | Pinch thumb and index finger | Press (hold the pinch to drag). |
 | Open palm | Erase (Board). |
 | Fast sideways swipe | Next or previous slide. |

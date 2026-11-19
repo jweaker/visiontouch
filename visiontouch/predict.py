@@ -27,6 +27,7 @@ ROW_RIDGE = 0.05  # how strongly per-row colour strengths are held at "no change
 ROW_LIMIT = 0.3  # largest allowed change in a row
 BAND_SLACK = 0.07  # extra tolerance where banding would change the pixel most
 CALIBRATION_PULL = 1e-2  # smoothness of the calibrated colour map
+TOLERANCE = 5  # neighbourhood (working pixels) searched for a matching predicted value
 NO_CHANGE = np.vstack([np.eye(3), np.zeros((1, 3))]).astype(np.float32)  # exposure matrix + offset
 EXPONENTS = np.float32([(i, j, k) for i in range(4) for j in range(4) for k in range(4) if i + j + k <= 3])
 
@@ -193,7 +194,7 @@ class Predictor:
         # Tolerance for misalignment and camera sharpening: compare against the
         # local min..max of the prediction, widened by a quarter of that range.
         np.clip(predicted, 0, 255, out=predicted)  # the camera cannot report more than white
-        kernel = np.ones((5, 5), np.uint8)
+        kernel = np.ones((TOLERANCE, TOLERANCE), np.uint8)
         low, high = cv2.erode(predicted, kernel), cv2.dilate(predicted, kernel)
         slack = 0.25 * (high - low) + band_slack
         residual = np.maximum(np.maximum(observed - high - slack, low - slack - observed), 0).max(2)

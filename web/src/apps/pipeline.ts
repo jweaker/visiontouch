@@ -46,6 +46,7 @@ export const pipeline: App = {
     // Only ask the engine for streams when it's connected; otherwise show friendly placeholders.
     let alive = true
     async function load() {
+      stopStreams() // first: six open streams would leave no connection for the fetch below
       let live: string[] = []
       if (engine.connected) {
         try {
@@ -56,7 +57,6 @@ export const pipeline: App = {
         }
       }
       if (!alive) return
-      stopStreams()
       root.querySelectorAll<HTMLElement>('figure').forEach((fig) => {
         const id = fig.dataset.stage!
         fig.querySelector('.frame')!.innerHTML = live.includes(id)

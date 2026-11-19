@@ -38,7 +38,7 @@ flowchart LR
     K --> O[Touch events in the apps<br/>or the OS mouse]
 ```
 
-Calibration (stages 2 and 3) runs once, in about five seconds, when the user presses "Calibrate". Everything else runs on every camera frame.
+Calibration (stages 2 and 3) takes about ten seconds. It runs on first use, when the user presses "Calibrate", and by itself when the engine sees that the camera or projector has moved (most of the picture disagrees with the prediction for several seconds, or phase correlation between the predicted and observed images shows a steady shift). Everything else runs on every camera frame.
 
 ![The pipeline on a slide with a synthetic hand](figures/pipeline_good.png)
 
@@ -77,7 +77,7 @@ Calibration (stages 2 and 3) runs once, in about five seconds, when the user pre
 
 ## 3. Colour calibration (what colours does the camera see?)
 
-**What it does.** The projector shows four mosaics of random colour tiles. For each tile we know the screen colour and see the camera colour. We fit a **colour map**: for each camera channel, a cubic polynomial in the screen's blue, green and red (20 terms, `predict.py`). Tile borders are left out, and the fit ignores outliers.
+**What it does.** The projector shows four mosaics of random colour tiles. Each camera photo is paired with a screenshot taken at the same time, so we know the screen colour of every tile (even if a notification covers part of it) and see the camera colour. We fit a **colour map**: for each camera channel, a cubic polynomial in the screen's blue, green and red (20 terms, `predict.py`). Tile borders are left out, and the fit ignores outliers.
 
 **Why.** A projected white is not camera white. The projector, the screen surface and the camera each change colours and brightness, and not in a straight line. Without this map, plain subtraction flags almost every pixel (see the ablation below).
 
@@ -156,7 +156,7 @@ How to read it: the colour map alone does not help, because the camera's exposur
 
 **Lecture.** Piecewise-linear transformations: thresholding turns a grey image into a binary image. Opening and closing are neighbourhood operations on that binary image (a min filter then a max filter, and the other way round), so they build on spatial filtering.
 
-**Main parameters.** `LOW` and `HIGH`. Lower thresholds find more of the hand but raise false alarms. The ROC curve and the sweep show where our choice sits.
+**Main parameters.** `LOW` and `HIGH`. Lower thresholds find more of the hand but raise false alarms. The ROC curve and the sweep show where our choice sits. The engine also has a user **sensitivity** setting that divides both thresholds by one number between 0.4 and 2.5 (protocol command `sensitivity`); our tests use the default, 1.
 
 ![ROC curves](figures/roc.png)
 
@@ -173,13 +173,13 @@ How to read it: the colour map alone does not help, because the camera's exposur
 
 ## 6. Fingertip
 
-**What it does** (`find_tips` in `hands.py`). An arm always enters the picture from an edge. So a blob counts as a hand only if it touches a 9-pixel band along the edge of the projected area. The entry point is the mean of the blob's pixels in that band. The fingertip is the mean of the 1 % of blob pixels farthest from the entry point.
+**What it does** (`find_tips` in `hands.py`). An arm always enters the picture from an edge. So a blob counts as a hand only if at least 5 of its pixels lie in a thin band, about 4 working pixels wide, along the edge of the projected area (the area minus its 9×9 erosion). The entry point is the mean of the blob's pixels in that band. The fingertip is the mean of the 1 % of blob pixels farthest from the entry point.
 
 **Why.** It is simple, fast, and works for any hand shape that points away from the body. Islands in the middle of the screen (a flicker, a reflection) are ignored.
 
 **Lecture.** Binary images and pixel distances (Euclidean distance between pixel coordinates). The rule itself is our own.
 
-**Main parameter.** The edge band (9 px). If it is wider, false blobs near the edge count as arms; if narrower, an arm that enters at a slant may be missed.
+**Main parameter.** The edge band (set by the 9×9 erosion). If it is wider, false blobs near the edge count as arms; if narrower, an arm that enters at a slant may be missed.
 
 ![Fingertip error](figures/fingertip.png)
 
@@ -221,6 +221,7 @@ Time per call on this laptop (median): Webcam: whole frame 14 ms, crop 14 ms; Ph
 
 - **Click by dwell**: hold the pointing finger still (within 2.5 % of the screen width) for 0.8 s.
 - **Click by pinch**: the pinch pose holds the button down.
+- **Hold mode** (protocol command `dwell` set to `hold`): the first hold presses and stays pressed while the finger moves, the next hold releases. This lets you draw without pinching; apps that draw switch it on when they open.
 - **Swipe**: move 30 % of the screen width sideways within 0.5 s (used by the Slides app).
 
 **Lecture.** Beyond the lectures (the Kalman filter is a state estimator from control theory).

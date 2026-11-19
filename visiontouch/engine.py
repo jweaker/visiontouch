@@ -236,7 +236,9 @@ class Engine:
                 half = 0.13 * p.span
                 centre = tip + towards_arm / (np.linalg.norm(towards_arm) + 1e-6) * half * 0.5
                 points = self.landmarker.detect(frame, centre, half)
-                if points is not None:
+                # Believe the landmarks only if the hand they describe ends where
+                # the blob ends; otherwise they were imagined on the background.
+                if points is not None and np.linalg.norm(points - tip, axis=1).min() < 0.3 * half:
                     pose, position = read_pose(points)
                     drawn.append(points)
             detections.append({"pos": self._to_content(_apply(p.cam_to_screen, position)), "pose": pose})

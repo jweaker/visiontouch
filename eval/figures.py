@@ -103,6 +103,22 @@ def pipeline_strips(results):
     pipeline_strip(results, "0", bad, "hand", "pipeline_failure", "Failure case")
 
 
+# --- dataset ---
+
+def dataset():
+    """What was projected, and what each camera saw, for three test pictures."""
+    cases = [("slide_light", "hand"), ("balloons", "shadow"), ("photo3", "hand")]
+    fig, axes = plt.subplots(3, 3, figsize=(16, 9.6))
+    for row, (picture, kind) in zip(axes, cases):
+        folder = ex.ROOT / f"{picture}__{kind}"
+        image_panel(row[0], cv2.cvtColor(cv2.imread(str(folder / "screen.png")), cv2.COLOR_BGR2RGB), f"projected: {picture}, synthetic {kind}")
+        for ax, cam in zip(row[1:], ex.CAMERAS):
+            image_panel(ax, cv2.cvtColor(cv2.imread(str(folder / f"{cam}_1.jpg")), cv2.COLOR_BGR2RGB), f"{CAM_LABEL[cam]} camera")
+    fig.suptitle("The recorded dataset: 23 pictures x (clean, shadow, lit hand) x 3 frames x 2 cameras", x=0.01, ha="left")
+    fig.tight_layout()
+    save(fig, "dataset")
+
+
 # --- banding ---
 
 def banding(results):
@@ -439,6 +455,7 @@ def mediapipe(results):
 def main():
     results = json.loads(ex.RESULTS.read_text())
     rig = ex.rig_reports()
+    dataset()
     pipeline_strips(results)
     banding(results)
     ablation(results)
