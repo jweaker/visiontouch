@@ -22,28 +22,44 @@ from visiontouch.predict import SCREEN_SCALE  # noqa: E402
 
 W, H = 1280, 720  # screen
 CAMERA = (1280, 720)
+DELAY = 0.2  # seconds between drawing a picture and the camera seeing it
+TONE = (255 * (np.arange(256) / 255) ** 0.8).astype(np.uint8)  # the camera's tone curve
+_rows = np.arange(CAMERA[1], dtype=np.float32)[:, None, None] / 40
+BANDS = [1 + 0.04 * np.sin(_rows + phase + np.float32([0, 2.1, 4.2])) for phase in range(7)]
+NOISE = [np.random.default_rng(i).normal(0, 1.5, (CAMERA[1], CAMERA[0], 3)).astype(np.float32) for i in range(5)]
 # Screen -> camera: a slanted projector seen by a camera off to one side.
 VIEW = cv2.getPerspectiveTransform(np.float32([[0, 0], [W, 0], [W, H], [0, H]]),
                                    np.float32([[250, 110], [1010, 150], [980, 600], [280, 560]]))
 
 
 class SimulatedRig:
-    """Plays three roles for the engine: stage server, camera and screen."""
+    """Plays three roles for the engine: stage server, camera and screen.
+    Like a real projector, it shows a picture a little late (`DELAY`)."""
 
     name = "simulated"
 
     def __init__(self):
         self.inbox, self.window, self.sent = queue.Queue(), (W, H), []
         self.size, self.origin = (W, H), (0, 0)
+        self.timeline = []  # (time, picture, half-size picture) for every change of the screen
         self.pattern = None  # what the engine asked the stage to show
         self.content = np.full((H, W, 3), 235, np.uint8)  # what the stage shows otherwise
         self.in_front = None  # mask of something between projector and wall (content pixels)
-        self.frames, self.rng = 0, np.random.default_rng(0)
-        self.recent = []  # the last few screen pictures, as real screen capture keeps them
+        self.frames = 0
+
+    @property
+    def content(self):
+        return self._content
+
+    @content.setter
+    def content(self, picture):
+        self._content = picture
+        self._note()  # the moment the stage draws something new
 
     # stage server
     def show(self, image):
         self.pattern = image
+        self._note()
         return True
 
     def send(self, message):
@@ -53,33 +69,42 @@ class SimulatedRig:
         pass
 
     # screen capture
-    def _on_screen(self):
-        return self.content if self.pattern is None else self.pattern
+    def _note(self):
+        """Record the picture on screen now, if it changed."""
+        now, picture = time.monotonic(), (self._content if self.pattern is None else self.pattern)
+        if not self.timeline or self.timeline[-1][1] is not picture:
+            small = cv2.resize(picture, None, fx=SCREEN_SCALE, fy=SCREEN_SCALE, interpolation=cv2.INTER_AREA)
+            self.timeline = [entry for entry in self.timeline if now - entry[0] < 2] + [(now, picture, small)]
+        return now
 
-    def at(self, when, window=0.12):
-        """The picture on screen now, plus the different pictures shown just before."""
-        now = cv2.resize(self._on_screen(), None, fx=SCREEN_SCALE, fy=SCREEN_SCALE, interpolation=cv2.INTER_AREA)
-        if self.recent and np.array_equal(self.recent[-1], now):
-            now = self.recent[-1]
-        else:
-            self.recent = (self.recent + [now])[-3:]
-        return now, [p for p in self.recent[:-1] if p.shape == now.shape]
+    def _shown(self, when):
+        """The timeline entry that was on screen at time `when`."""
+        earlier = [entry for entry in self.timeline if entry[0] <= when]
+        return earlier[-1] if earlier else self.timeline[0]
+
+    def at(self, when, window=0.15):
+        self._note()
+        best = self._shown(when)
+        others = [e[2] for e in self.timeline if abs(e[0] - when) <= window and e is not best and e[2].shape == best[2].shape]
+        return best[2], others
 
     def latest(self):
-        return time.monotonic(), self.at(0)[0]
+        return self._note(), self.timeline[-1][2]
 
     # camera
     def read(self, newer_than=0, timeout=2.0):
-        picture = self._on_screen().astype(np.float32)
+        now = self._note()
+        picture = self._shown(now - DELAY)[1]  # the projector is late
         if self.in_front is not None and self.pattern is None:
-            picture[self.in_front > 0] *= 0.08  # a shadow: almost no projector light
+            picture = picture.copy()
+            picture[self.in_front > 0] //= 12  # a shadow: almost no projector light
         view = cv2.warpPerspective(picture, VIEW, CAMERA, borderValue=(25, 25, 25))
-        view = 255 * (view / 255) ** 0.8 * [0.95, 1.0, 0.92]  # camera tone curve and colour cast
-        rows = np.arange(CAMERA[1])[:, None, None] / 40 + self.frames  # rainbow banding moves every frame
-        view = view * (1 + 0.04 * np.sin(rows + np.array([0, 2.1, 4.2]))) + self.rng.normal(0, 1.5, view.shape)
+        view = cv2.LUT(view, TONE).astype(np.float32) * np.float32([0.95, 1.0, 0.92])  # tone curve and colour cast
+        view *= BANDS[self.frames % len(BANDS)]  # rainbow banding, different every frame
+        view += NOISE[self.frames % len(NOISE)]
         self.frames += 1
         time.sleep(0.005)
-        return np.clip(view, 0, 255).astype(np.uint8), time.monotonic(), self.frames
+        return np.clip(view, 0, 255).astype(np.uint8), now, self.frames
 
     def close(self):
         pass
@@ -90,6 +115,7 @@ def test_calibrate_then_find_a_fingertip():
     engine = Engine(rig, camera=rig, screen=rig, landmarks=False)
     assert engine.calibrate(), engine.message
     assert "Calibrated" in engine.message
+    assert abs(engine.latency - DELAY) < 0.08, f"measured delay {engine.latency:.2f} s"
     # The calibration must have recovered the true geometry.
     centre = cv2.perspectiveTransform(np.float32([[[W / 2, H / 2]]]), VIEW)[0, 0]
     found = cv2.perspectiveTransform(centre[None, None], engine.predictor.cam_to_screen)[0, 0]

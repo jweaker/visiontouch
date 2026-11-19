@@ -175,21 +175,13 @@ class Predictor:
             delta = cv2.blur(delta.astype(np.float32), (1, 5))
         return (slopes.reshape(h, -1, 3) @ delta[..., None]).reshape(h, w, 3)
 
-    def _compare(self, observed, predicted, band_slack):
-        """Distance of each observed pixel from the range of predicted values
-        in its neighbourhood (which forgives misalignment and camera
-        sharpening), widened by a quarter of that range and the banding slack."""
-        kernel = np.ones((TOLERANCE, TOLERANCE), np.uint8)
-        low, high = cv2.erode(predicted, kernel), cv2.dilate(predicted, kernel)
-        slack = 0.25 * (high - low) + band_slack
-        return np.maximum(np.maximum(observed - high - slack, low - slack - observed), 0).max(2)
-
     def residual(self, screen_small, frame, others=(), skip=None):
         """How strongly each working pixel disagrees with the prediction, in
-        grey levels. `others` are screen pictures from just before and after:
-        where the screen is changing (an animation, the cursor ring), a pixel
-        is accepted if it fits any of them, because the exact moment the
-        camera saw is not known. `skip` marks working pixels to leave out.
+        grey levels. `others` are the screen pictures shown just before and
+        after this one: the camera's delay is only known to within a few
+        frames, so where the screen is changing (an animation, the cursor
+        ring) a pixel is accepted if it lies within the range of what any of
+        them would look like. `skip` marks working pixels to leave out.
         Returns (residual, predicted, observed)."""
         observed = self.crop_camera(frame)
         warped, terms, flat, band_slack = self._terms(screen_small)
@@ -218,13 +210,22 @@ class Predictor:
         grid = np.where(np.isnan(grid), 1.0, np.clip(grid, 0.8, 1.25)).astype(np.float32)
         predicted *= cv2.resize(grid, self.size, interpolation=cv2.INTER_CUBIC)[..., None]
         np.clip(predicted, 0, 255, out=predicted)  # the camera cannot report more than white
-        residual = self._compare(observed, predicted, band_slack)
-        for other_terms, differs in moving:
-            # The same prediction, with the changed pixels swapped for what the other picture shows there.
-            alternative = predicted.copy()
-            rows = differs.ravel()
-            alternative[differs] = np.clip(predicted[differs] + (other_terms[rows] - terms[rows]) @ colour_map, 0, 255)
-            residual = np.minimum(residual, self._compare(observed, alternative, band_slack))
+        # The range of plausible values per pixel: just the prediction, widened
+        # where the screen is changing by what the other pictures would give.
+        lowest, highest = predicted, predicted
+        if moving:
+            lowest, highest = predicted.copy(), predicted.copy()
+            for other_terms, differs in moving:
+                rows = differs.ravel()
+                other = np.clip(predicted[differs] + (other_terms[rows] - terms[rows]) @ colour_map, 0, 255)
+                lowest[differs] = np.minimum(lowest[differs], other)
+                highest[differs] = np.maximum(highest[differs], other)
+        # Tolerance for misalignment and camera sharpening: compare against the
+        # local min..max of that range, widened by a quarter of its width.
+        kernel = np.ones((TOLERANCE, TOLERANCE), np.uint8)
+        low, high = cv2.erode(lowest, kernel), cv2.dilate(highest, kernel)
+        slack = 0.25 * (high - low) + band_slack
+        residual = np.maximum(np.maximum(observed - high - slack, low - slack - observed), 0).max(2)
         residual[~self.inside] = 0
         if skip is not None:
             residual[skip] = 0

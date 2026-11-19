@@ -46,10 +46,10 @@ class Screen:
         with self._lock:
             return self._frames[-1] if self._frames else (0.0, None)
 
-    def at(self, when, window=0.12):
+    def at(self, when, window=0.15):
         """The screen picture at time `when`, plus the other pictures shown
-        within `window` seconds around it (at most two, nearest first). While
-        the screen is changing the camera may have seen any of them."""
+        within `window` seconds around it. The camera's delay varies by a few
+        frames, so while the screen is changing it may have seen any of them."""
         with self._lock:
             frames = list(self._frames)
         if not frames:
@@ -57,7 +57,7 @@ class Screen:
         frames.sort(key=lambda f: abs(f[0] - when))
         best = frames[0][1]
         others = {id(f[1]): f[1] for f in frames[1:] if abs(f[0] - when) <= window and f[1] is not best}
-        return best, list(others.values())[:2]
+        return best, list(others.values())
 
     def close(self):
         self._running = False

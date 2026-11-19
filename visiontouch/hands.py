@@ -16,6 +16,7 @@ LOW, HIGH = 8, 18  # residual thresholds (grey levels): weak evidence, strong ev
 MIN_AREA = 0.0015  # smallest blob, as a fraction of the working image
 GAP = 9  # pieces closer than this (working pixels) count as one blob
 THICK = 7  # a blob must be at least this wide somewhere (working pixels)
+SOLID = 5  # parts of a blob narrower than this (working pixels) cannot be the fingertip
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"
 
 
@@ -60,6 +61,10 @@ def find_tips(labels, blobs, inside):
     Returns a list of dicts: tip (x, y), entry (x, y), area, label."""
     core = cv2.erode(inside.astype(np.uint8), np.ones((9, 9), np.uint8), borderType=cv2.BORDER_CONSTANT, borderValue=0)
     edge = inside & (core == 0)
+    # The tip is looked for on the solid part of the blob only. A finger is
+    # several pixels wide; a thin line stuck to it (the app's own cursor ring,
+    # the outline of a button) is not, and must not pull the tip away.
+    solid = cv2.morphologyEx((labels > 0).astype(np.uint8), cv2.MORPH_OPEN, np.ones((SOLID, SOLID), np.uint8)) > 0
     hands = []
     for label in blobs:
         ys, xs = np.nonzero(labels == label)
@@ -67,6 +72,9 @@ def find_tips(labels, blobs, inside):
         if on_edge.sum() < 5:
             continue  # an island in the middle of the screen is not an arm
         entry = np.array([xs[on_edge].mean(), ys[on_edge].mean()])
+        ys, xs = np.nonzero((labels == label) & solid)
+        if len(xs) < 3:
+            continue
         distance = np.hypot(xs - entry[0], ys - entry[1])
         far = distance >= np.partition(distance, -max(len(distance) // 100, 3))[-max(len(distance) // 100, 3)]
         tip = np.array([xs[far].mean(), ys[far].mean()])

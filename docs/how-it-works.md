@@ -127,9 +127,9 @@ The screenshot is warped into the camera's view with the homography (`cv2.warpPe
 
 ### 4e. When the screen itself is changing
 
-**What it does.** Games move, buttons light up, and the app draws a cursor ring that follows your finger. The camera frame is about 0.2 s old, and we cannot know exactly which screen picture it saw. So when the screenshots just before and after differ, each changed pixel is compared with *all* of them and the smallest residual wins (`others` in `Predictor.residual`). A pixel that fits the old or the new picture is fine. A hand fits neither, so it is still found.
+**What it does.** Games move, buttons light up, and the app draws a cursor ring that follows your finger. The camera frame is about 0.2 s old, and that delay wanders by a few frames, so we cannot know exactly which screen picture the camera saw. The engine therefore takes every screenshot from 0.15 s before to 0.15 s after the expected moment. Where they differ, the allowed range for a pixel stretches from the darkest to the brightest value any of them predicts (`others` in `Predictor.residual`). A pixel inside that range is fine. A hand is usually outside it, so it is still found.
 
-**Why.** Our first version simply ignored changed pixels. That blinded the engine exactly at the fingertip, because the cursor ring changes there all the time. In a simulated test the pointer then wobbled by 70 px and never clicked.
+**Why.** Our first version simply ignored changed pixels. That blinded the engine exactly at the fingertip, because the cursor ring changes there all the time: in a simulated test the pointer wobbled by 70 px and never clicked. Our second version compared against only the two nearest screenshots, which broke as soon as the simulation was given a realistic 0.2 s display delay.
 
 **A rule for the apps that follows from the physics.** A finger is invisible to the camera wherever the projector shows something dark, because it receives no light there. So nothing dark may be drawn at the fingertip: the cursor ring is bright (a dark outline cut the fingertip off from the hand), and the Board draws in blue by default (with black ink the pen trailed about 40 px behind the finger in simulation). Both cases are regression tests in `tests/test_simulated_rig.py`.
 
