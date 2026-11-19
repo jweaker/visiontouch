@@ -17,8 +17,8 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 | --- | --- |
 | `{"t":"pointers","p":[{"id":1,"x":0.42,"y":0.31,"down":false,"pose":"point"}]}` | Sent every camera frame (about 30/s). One entry per tracked hand; an empty list means no hands. `down` is the click state (pinch or wall touch). `pose` is `point`, `pinch`, `palm` or `fist`. |
 | `{"t":"gesture","name":"swipe_left"}` | One-shot gesture: `swipe_left`, `swipe_right`. |
-| `{"t":"mask","w":64,"h":36,"b64":"..."}` | Silhouette of everything in front of the screen, row-major, one byte per cell (0 or 255), base64. Sent about 15/s after `subscribe_mask`. |
-| `{"t":"pattern","id":7,"url":"/pattern/7.png"}` | Show this image full-window, unwarped, on top of everything, at 1:1 pixels. `url: null` removes it. Used for calibration. |
+| `{"t":"mask","w":64,"h":36,"b64":"..."}` | Silhouette of everything in front of the screen, row-major, one byte per cell (0 or 255), base64. The grid covers the content box, like pointer coordinates. Sent about 15/s after `subscribe_mask`. |
+| `{"t":"pattern","id":7,"url":"/pattern/7.png"}` | Show this image stretched to the full window, unwarped, on top of everything. `url: null` removes it. Used for calibration. |
 | `{"t":"warp","m":[9 numbers]}` | Row-major 3×3 homography mapping content-box pixels to window pixels (keystone correction). `m: null` means identity. |
 | `{"t":"state","calibrated":true,"camera":"MacBook","fps":29.8,"latency_ms":110,"mode":"apps","keystone":true,"message":""}` | Engine status, sent on change and once a second. |
 
@@ -29,7 +29,7 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 | `{"t":"hello","w":1920,"h":1080}` | Sent on connect and on resize: window size in CSS pixels. |
 | `{"t":"pattern_shown","id":7}` | The pattern with this id has been painted (send after two animation frames). |
 | `{"t":"cmd","name":"calibrate"}` | Run calibration. |
-| `{"t":"cmd","name":"mode","value":"apps"}` | `apps`: pointers drive the stage. `desktop`: pointers drive the OS mouse. |
+| `{"t":"cmd","name":"mode","value":"apps"}` | `apps`: pointers drive the stage. `desktop`: pointers drive the OS mouse; the engine shrinks the stage window to a small always-on-top strip and the stage shows only a "back to apps" button in it. |
 | `{"t":"cmd","name":"subscribe_mask","value":true}` | Start or stop mask messages. |
 | `{"t":"cmd","name":"keystone","value":true}` | Turn automatic keystone correction on or off (the engine answers with a `warp`). |
 | `{"t":"cmd","name":"camera","value":"0"}` | Switch camera source. |
@@ -37,7 +37,11 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 
 ## Debug images
 
-`GET /debug/<stage>.mjpg` streams a pipeline stage as MJPEG, usable directly as an `<img src>`. Stages: `camera`, `rectified`, `predicted`, `residual`, `mask`, `overlay`. `GET /debug/stages` lists the names that are live.
+`GET /debug/<stage>.mjpg` streams a pipeline stage as MJPEG, usable directly as an `<img src>`. Stages: `camera`, `rectified`, `predicted`, `residual`, `mask`, `overlay`. `GET /debug/stages` returns a JSON array of the names that are live.
+
+## Saving files
+
+`POST /save/<name>.png` with the PNG bytes as the body stores the picture in the user's `Pictures/VisionTouch` folder and answers `{"path": "..."}`. The built-in window cannot download files, so the Board uses this to save.
 
 ## How apps receive touches
 

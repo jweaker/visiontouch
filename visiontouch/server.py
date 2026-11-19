@@ -56,12 +56,13 @@ class Server:
 
     def _run(self):
         asyncio.set_event_loop(self._loop)
-        app = web.Application()
+        app = web.Application(client_max_size=32 * 2 ** 20)
         app.add_routes([
             web.get("/ws", self._ws),
             web.get("/pattern/{id}.png", self._get_pattern),
             web.get("/debug/stages", lambda r: web.json_response(sorted(self._debug))),
             web.get("/debug/{name}.mjpg", self._mjpeg),
+            web.post("/save/{name}.png", self._save),
         ])
         if WEB_DIR.exists():
             app.add_routes([web.get("/", lambda r: web.FileResponse(WEB_DIR / "index.html")), web.static("/", WEB_DIR)])
@@ -128,6 +129,15 @@ class Server:
         if png is None or request.match_info["id"] != str(number):
             raise web.HTTPNotFound()
         return web.Response(body=png, content_type="image/png", headers={"Cache-Control": "no-store"})
+
+    async def _save(self, request):
+        """Store a picture sent by the stage (the Board's Save button)."""
+        folder = Path.home() / "Pictures" / "VisionTouch"
+        folder.mkdir(parents=True, exist_ok=True)
+        name = "".join(c for c in request.match_info["name"] if c.isalnum() or c in "-_") or "picture"
+        path = folder / f"{name}-{time.strftime('%Y%m%d-%H%M%S')}.png"
+        path.write_bytes(await request.read())
+        return web.json_response({"path": str(path)})
 
     async def _mjpeg(self, request):
         name = request.match_info["name"]
