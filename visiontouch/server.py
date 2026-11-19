@@ -11,6 +11,7 @@ from pathlib import Path
 import cv2
 from aiohttp import WSMsgType, web
 
+STAGES = ["camera", "rectified", "predicted", "residual", "mask", "overlay"]  # debug images, in pipeline order
 WEB_DIR = Path(__file__).parent.parent / "web" / "dist"
 
 # Shown only when the real stage has not been built: enough to calibrate.
@@ -47,6 +48,7 @@ class Server:
         self._pattern = (0, None)  # (id, png bytes)
         self._shown = threading.Event()
         self._debug = {}  # stage name -> newest JPEG bytes
+        self.viewers = 0  # open debug streams; the engine skips debug images when nobody watches
         self._loop = asyncio.new_event_loop()
         self._ready = threading.Event()
 
@@ -60,7 +62,7 @@ class Server:
         app.add_routes([
             web.get("/ws", self._ws),
             web.get("/pattern/{id}.png", self._get_pattern),
-            web.get("/debug/stages", lambda r: web.json_response(sorted(self._debug))),
+            web.get("/debug/stages", lambda r: web.json_response(STAGES)),
             web.get("/debug/{name}.mjpg", self._mjpeg),
             web.post("/save/{name}.png", self._save),
         ])
@@ -141,18 +143,21 @@ class Server:
 
     async def _mjpeg(self, request):
         name = request.match_info["name"]
-        if name not in self._debug:
+        if name not in STAGES:
             raise web.HTTPNotFound()
         response = web.StreamResponse(headers={"Content-Type": "multipart/x-mixed-replace; boundary=frame"})
         await response.prepare(request)
         last = None
+        self.viewers += 1
         try:
             while True:
                 jpeg = self._debug.get(name)
-                if jpeg is not last:
+                if jpeg is not None and jpeg is not last:
                     last = jpeg
                     await response.write(b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + jpeg + b"\r\n")
                 await asyncio.sleep(1 / 15)
         except (ConnectionResetError, asyncio.CancelledError):
             pass
+        finally:
+            self.viewers -= 1
         return response

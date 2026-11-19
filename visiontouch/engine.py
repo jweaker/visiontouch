@@ -3,6 +3,7 @@
     camera frame -> predicted background -> residual -> mask -> fingertips
                  -> hand pose -> tracker -> stage (or OS mouse)
 """
+import base64
 import json
 import os
 import re
@@ -112,7 +113,7 @@ class Engine:
         return frame
 
     def calibrate(self):
-        """Project the calibration patterns and build the predictor. About 5 seconds."""
+        """Project the calibration patterns and build the predictor. About 10 seconds."""
         w, h = self.screen.size
         pattern, corners = marker_pattern(w, h)
         self._say("Calibrating: finding the screen")
@@ -250,12 +251,12 @@ class Engine:
         if self.mask_wanted and self._count % 2 == 0:
             to_grid = np.diag([MASK_GRID[0] / self.screen.size[0], MASK_GRID[1] / self.screen.size[1], 1.0]) @ np.linalg.inv(self._content()) @ np.linalg.inv(p.screen_to_work)
             grid = cv2.warpPerspective(mask.astype(np.uint8) * 255, to_grid, MASK_GRID, flags=cv2.INTER_AREA)
-            self.server.send({"t": "mask", "w": MASK_GRID[0], "h": MASK_GRID[1], "b64": __import__("base64").b64encode(np.where(grid > 60, 255, 0).astype(np.uint8).tobytes()).decode()})
-        if self._count % 3 == 0:
-            self._publish_debug(p, frame, observed, predicted, residual, mask, pointers, drawn)
+            self.server.send({"t": "mask", "w": MASK_GRID[0], "h": MASK_GRID[1], "b64": base64.b64encode(np.where(grid > 60, 255, 0).astype(np.uint8).tobytes()).decode()})
+        if self._count % 3 == 0 and getattr(self.server, "viewers", 1):  # only while someone is watching
+            self._publish_debug(p, observed, predicted, residual, mask, pointers, drawn)
         return pointers
 
-    def _publish_debug(self, p, frame, observed, predicted, residual, mask, pointers, landmarks):
+    def _publish_debug(self, p, observed, predicted, residual, mask, pointers, landmarks):
         view = observed.clip(0, 255).astype(np.uint8)
         self.server.debug("camera", view)
         to_screen = np.diag([0.25, 0.25, 1.0]) @ np.linalg.inv(p.screen_to_work)
@@ -329,6 +330,8 @@ class Engine:
             elif name == "keystone":
                 self.keystone = bool(value)
                 self._send_warp()
+            elif name == "dwell":
+                self.tracker.hold = value == "hold"
             elif name == "sensitivity":
                 self.sensitivity = float(np.clip(float(value), 0.4, 2.5))
             elif name == "camera":

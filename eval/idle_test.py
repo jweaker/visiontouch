@@ -20,6 +20,7 @@ OUT = Path("runs/idle")
 
 def main(server):
     assert server.wait_for_stage(), "stage window did not connect"
+    server.viewers = 1  # keep debug images coming: this test saves them
     OUT.mkdir(parents=True, exist_ok=True)
     engine = Engine(server, CAMERA)
     if "--calibrate" in sys.argv or engine.predictor is None:

@@ -69,6 +69,10 @@ Calibration (stages 2 and 3) runs once, in about five seconds, when the user pre
 ![Calibration residuals](figures/calibration.png)
 
 <!-- BEGIN calibration -->
+| Camera | Markers found | RMS error (px) | Median corner error (px) | Worst corner (px) | RMS over 3 photos (px) | Same H on the other session's photo (px) |
+|---|---|---|---|---|---|---|
+| Webcam | 58 / 60 | 1.22 | 0.95 | 7.3 | 1.23, 1.22, 1.30 | 1.59 |
+| Phone | 53 / 60 | 1.94 | 1.82 | 12.3 | 1.79, 1.94, 1.88 | 3.07 |
 <!-- END calibration -->
 
 ## 3. Colour calibration (what colours does the camera see?)
@@ -128,6 +132,13 @@ We switched the steps on one at a time and scored all 23 test pictures, 3 frames
 ![Ablation](figures/ablation.png)
 
 <!-- BEGIN ablation -->
+| Variant | Webcam: clean pixels flagged | Webcam: clean frames with a false hand | Webcam: hand pixels found at 1 % false positives | Phone: clean pixels flagged | Phone: clean frames with a false hand | Phone: hand pixels found at 1 % false positives |
+|---|---|---|---|---|---|---|
+| (a) plain subtraction, global gain | 91.2 % | 96 % | 28 % | 97.5 % | 100 % | 29 % |
+| (b) + colour map | 99.8 % | 100 % | 21 % | 98.5 % | 100 % | 32 % |
+| (c) + exposure adaptation | 86.0 % | 91 % | 55 % | 84.4 % | 91 % | 45 % |
+| (d) + row banding correction | 32.8 % | 43 % | 55 % | 34.6 % | 59 % | 40 % |
+| (e) + neighbourhood tolerance (full) | 6.1 % | 30 % | 66 % | 3.7 % | 39 % | 70 % |
 <!-- END ablation -->
 
 How to read it: the colour map alone does not help, because the camera's exposure at test time differs from calibration time. It pays off once exposure adaptation is added. Row correction removes most of the remaining false pixels. The tolerance step removes the edge errors. Even the full method still flags a hand in some clean frames: these come almost entirely from photos and dark slides (section "What fails").
@@ -150,6 +161,12 @@ How to read it: the colour map alone does not help, because the camera's exposur
 ![ROC curves](figures/roc.png)
 
 <!-- BEGIN thresholds -->
+| Camera | Threshold (grey levels) | Clean pixels above it | Hand pixels above it |
+|---|---|---|---|
+| Webcam | LOW = 8 | 8.8 % | 83.2 % |
+| Webcam | HIGH = 18 | 2.3 % | 74.6 % |
+| Phone | LOW = 8 | 7.2 % | 81.2 % |
+| Phone | HIGH = 18 | 1.9 % | 74.3 % |
 <!-- END thresholds -->
 
 ![Threshold sweep](figures/sweep.png)
@@ -167,6 +184,10 @@ How to read it: the colour map alone does not help, because the camera's exposur
 ![Fingertip error](figures/fingertip.png)
 
 <!-- BEGIN fingertip -->
+| Camera | Frames with a hand | Hand found | Median error (px) | Median (% of width) | 90th percentile (px) | Found tips within 20 px |
+|---|---|---|---|---|---|---|
+| Webcam | 138 | 88 % | 11.9 | 0.62 % | 496 | 60 % |
+| Phone | 138 | 89 % | 10.1 | 0.52 % | 767 | 65 % |
 <!-- END fingertip -->
 
 ## 7. Hand pose with MediaPipe
@@ -184,6 +205,14 @@ How to read it: the colour map alone does not help, because the camera's exposur
 ![MediaPipe on synthetic hands](figures/mediapipe.png)
 
 <!-- BEGIN mediapipe -->
+| Input | Webcam: fired | Phone: fired |
+|---|---|---|
+| clean frame, whole image | 0 / 23 | 1 / 23 |
+| synthetic hand, whole image | 0 / 46 | 1 / 46 |
+| synthetic hand, engine's crop | 2 / 46 | 1 / 46 |
+| synthetic hand, crop at the true tip | 4 / 46 | 1 / 46 |
+
+Time per call on this laptop (median): Webcam: whole frame 14 ms, crop 14 ms; Phone: whole frame 14 ms, crop 14 ms.
 <!-- END mediapipe -->
 
 ## 8. Tracking, clicks and swipes
@@ -211,6 +240,12 @@ How to read it: the colour map alone does not help, because the camera's exposur
 ![Keystone before and after](figures/keystone.png)
 
 <!-- BEGIN keystone -->
+|  | Edge tilt | Aspect ratio (target 1.78) | Markers found |
+|---|---|---|---|
+| Before | 5.11° | 1.668 | 58 |
+| After | 0.08° | 1.777 | 59 |
+
+Pointer error inside the corrected picture (synthetic shadow): median 5.1 px over 93 frames.
 <!-- END keystone -->
 
 ## 10. Output
@@ -224,6 +259,16 @@ The engine sends pointer positions about 30 times a second to the web front end,
 ![Every picture](figures/per_picture.png)
 
 <!-- BEGIN per_class -->
+| Content | Camera | Clean pixels flagged | Clean frames with a false hand | Shadow pixels found | Lit-hand pixels found | Median tip error |
+|---|---|---|---|---|---|---|
+| plain colours and patterns | Webcam | 0.0 % | 0 % | 91 % | 74 % | 10 px |
+| plain colours and patterns | Phone | 2.6 % | 27 % | 85 % | 90 % | 9 px |
+| slides and text | Webcam | 7.5 % | 33 % | 100 % | 90 % | 5 px |
+| slides and text | Phone | 3.1 % | 33 % | 100 % | 96 % | 7 px |
+| drawings and games | Webcam | 0.7 % | 0 % | 100 % | 100 % | 6 px |
+| drawings and games | Phone | 0.4 % | 0 % | 100 % | 100 % | 10 px |
+| photos and desktop | Webcam | 16.5 % | 86 % | 95 % | 75 % | 90 px |
+| photos and desktop | Phone | 6.6 % | 71 % | 86 % | 64 % | 104 px |
 <!-- END per_class -->
 
 - **Photos and the desktop screenshot.** Fine detail (leaves, small icons) everywhere. In the failure figure below, the residual (panel 4) is high all over the textured areas, not only on the hand: at fine detail, small errors in position, blur and colour are larger than the 5×5 tolerance forgives. Clean frames then get false blobs. When a false blob joins the hand's blob, the "farthest point" lands in the wrong place, which is why the median tip error is large for this class.

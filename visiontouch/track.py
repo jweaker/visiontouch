@@ -42,13 +42,16 @@ class Pointer:
     def __init__(self, number, position, now):
         self.id, self.filter, self.seen, self.hits = number, Kalman(position), now, 0
         self.pose, self.down, self.candidate, self.pending = "point", False, "point", 0
-        self.anchor, self.anchor_time, self.tap_until, self.armed = np.array(position), now, 0.0, True
+        self.anchor, self.anchor_time, self.tap_until, self.armed, self.held = np.array(position), now, 0.0, True, False
         self.trail = deque()  # (time, x) for swipe detection
 
 
 class Tracker:
     def __init__(self, dwell=True):
         self.pointers, self.dwell = [], dwell
+        # What holding still does. False: one short tap (buttons). True: press
+        # and stay pressed until the next hold (drawing without a pinch).
+        self.hold = False
         self._next_id, self._swipe_ready = 1, 0.0
 
     def update(self, detections, now):
@@ -82,8 +85,12 @@ class Tracker:
             if np.linalg.norm(position - p.anchor) > DWELL_RADIUS:
                 p.anchor, p.anchor_time, p.armed = position.copy(), now, True
             elif self.dwell and p.armed and p.pose == "point" and now - p.anchor_time > DWELL_TIME:
-                p.tap_until, p.armed = now + TAP_TIME, False
-            p.down = p.pose == "pinch" or now < p.tap_until
+                p.armed = False
+                if self.hold:
+                    p.held = not p.held
+                else:
+                    p.tap_until = now + TAP_TIME
+            p.down = p.pose == "pinch" or now < p.tap_until or (self.hold and p.held)
             # Swipe: a fast, long, sideways move.
             p.trail.append((now, position[0]))
             while now - p.trail[0][0] > SWIPE_TIME:
@@ -126,4 +133,11 @@ if __name__ == "__main__":  # self-check
     tracker = Tracker()
     names = [g for i in range(14) for g in tracker.update([{"pos": (0.1 + 0.05 * i, 0.5), "pose": "palm"}], 10 + i / 30)[1]]
     assert names == ["swipe_right"], names
+    # Hold mode: the first hold presses, moving keeps it pressed, the next hold releases.
+    tracker = Tracker()
+    tracker.hold = True
+    path = [(0.3, 0.5)] * 30 + [(0.3 + 0.01 * i, 0.5) for i in range(30)] + [(0.6, 0.5)] * 30
+    downs = [tracker.update([{"pos": pos}], 20 + i / 30)[0] for i, pos in enumerate(path)]
+    downs = [d[0]["down"] for d in downs if d]
+    assert not downs[0] and downs[40] and not downs[-1], downs
     print("ok")

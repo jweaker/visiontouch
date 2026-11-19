@@ -144,6 +144,8 @@ test('every app works by hand and by mouse', async ({ page, request }, info) => 
   await expect(keystone).toHaveAttribute('aria-checked', 'false')
   await engineSend(request, state({ keystone: false, message: 'Calibrated: 48 markers, 1.3 px error, 110 ms delay, squared to the screen frame' }))
   await expect(page.locator('.engine-msg')).toContainText('1.3 px error')
+  await expect(page.locator('.engine-msg')).not.toHaveClass(/bad/)
+  await page.waitForTimeout(300) // switch animation
   await shot(page, info, '13-settings')
   await keystone.click()
   await expect(keystone).toHaveAttribute('aria-checked', 'true')

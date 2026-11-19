@@ -44,6 +44,7 @@ class PretendScreen:
 
 def main(server):
     assert server.wait_for_stage(), "stage window did not connect"
+    server.viewers = 1  # keep debug images coming: this test saves them
     OUT.mkdir(parents=True, exist_ok=True)
     if "--washed" in ARGS:  # imitate a weak projector in a lit room: grey blacks, dim whites
         server.view.evaluate_js("document.documentElement.style.filter = 'contrast(0.45) brightness(0.85)'")

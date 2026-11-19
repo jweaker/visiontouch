@@ -48,10 +48,11 @@ def blocks(results, rig, real):
     for cam, report in rig["live"].items():
         rows = report["pictures"]
         alarms = max(r["false_alarm_frames"] for r in rows)
-        good = [r for r in rows if r["picture"] != "text"]
-        meds = [r[k]["median_error_px"] for r in good for k in ("shadow", "hand") if r[k]["median_error_px"] is not None]
+        cases = [(r[k]["median_error_px"], r["picture"]) for r in rows for k in ("shadow", "hand") if r[k]["median_error_px"] is not None]
+        good = sum(e <= 20 for e, _ in cases)
+        worst = max(cases)
         lines.append(f"- **Live rig, {report['label']}:** false-alarm frames on clean pictures at most {p(alarms, 0)}; "
-                     f"per-picture median pointer error {min(meds):.0f}–{max(meds):.0f} px on the {len(good)} pictures other than dense text.")
+                     f"median pointer error within 20 px in {good} of {len(cases)} picture-and-hand cases; worst {worst[0]:.0f} px on `{worst[1]}`.")
     k = rig["keystone"].get("0")
     if k:
         lines.append(f"- **Keystone (webcam):** edge tilt {k['plain']['tilt_degrees']:.1f}° before, {k['corrected']['tilt_degrees']:.2f}° after; "

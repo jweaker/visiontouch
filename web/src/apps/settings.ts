@@ -19,7 +19,7 @@ export const settings: App = {
           <p>Shows a few patterns so the camera can learn where the screen is. Stand clear of the picture.</p>
           <div class="row">
             <button class="btn big" data-cmd="calibrate" style="--c:${C.sun}">Calibrate now</button>
-            <button class="switch" role="switch" aria-checked="false" data-keystone><i></i>Keystone correction</button>
+            <button class="switch" role="switch" aria-checked="false" data-keystone><i></i>Keystone</button>
           </div>
           <h2>Mode</h2>
           <div class="segmented">
@@ -55,7 +55,7 @@ export const settings: App = {
       // The engine reports calibration results and failures here.
       msg.textContent = (engine.connected && s?.message) || ''
       msg.hidden = !msg.textContent
-      msg.classList.toggle('bad', /fail|error|cannot|could not/i.test(msg.textContent))
+      msg.classList.toggle('bad', /fail|cannot|could not|not connected/i.test(msg.textContent))
       keystone.setAttribute('aria-checked', String(!!s?.keystone))
       root.querySelectorAll<HTMLButtonElement>('[data-cmd],[data-mode],[data-camera],[data-camera-field],[data-keystone]').forEach((b) => {
         b.disabled = !engine.connected

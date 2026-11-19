@@ -38,7 +38,13 @@ class PhoneStream:
         if not jar:
             raise RuntimeError("scrcpy-server not found; set SCRCPY_SERVER_PATH")
         version = subprocess.run([scrcpy, "--version"], capture_output=True, text=True).stdout.split()[1]
-        adb = [adb, "-s", serial] if serial else [adb]
+        if not serial:  # the first real phone; emulators are skipped
+            listed = subprocess.run([adb, "devices"], capture_output=True, text=True).stdout.splitlines()[1:]
+            phones = [line.split()[0] for line in listed if line.endswith("\tdevice") and not line.startswith("emulator-")]
+            if not phones:
+                raise RuntimeError("no Android phone found: connect it by USB and allow USB debugging")
+            serial = phones[0]
+        adb = [adb, "-s", serial]
         scid, port = f"{random.getrandbits(31):08x}", random.randint(27200, 27999)
         subprocess.run([*adb, "push", jar, PHONE_JAR], check=True, capture_output=True)
         subprocess.run([*adb, "forward", f"tcp:{port}", f"localabstract:scrcpy_{scid}"], check=True, capture_output=True)
