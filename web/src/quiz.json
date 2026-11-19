@@ -1,0 +1,68 @@
+[
+  {
+    "q": "A grayscale image stored with 8 bits per pixel can show how many grey levels?",
+    "choices": ["8", "64", "256", "1024"],
+    "answer": 2,
+    "why": "8 bits give 2⁸ = 256 levels, from 0 (black) to 255 (white)."
+  },
+  {
+    "q": "What does an image histogram count?",
+    "choices": ["Pixels at each intensity", "Edges in each row", "Colours per object", "Pixels per frame"],
+    "answer": 0,
+    "why": "Each bar is the number of pixels with that grey level."
+  },
+  {
+    "q": "A histogram bunched to the left (dark side) usually means the image is…",
+    "choices": ["Overexposed", "Underexposed", "Blurred", "Noisy"],
+    "answer": 1,
+    "why": "Most pixels are dark, so the image is underexposed."
+  },
+  {
+    "q": "Thresholding a grayscale image produces…",
+    "choices": ["A colour image", "A histogram", "A binary image", "A blurred image"],
+    "answer": 2,
+    "why": "Each pixel becomes 0 or 1 depending on whether it is above the threshold."
+  },
+  {
+    "q": "Which method picks a threshold automatically from the histogram?",
+    "choices": ["Sobel", "Otsu", "Canny", "Laplacian"],
+    "answer": 1,
+    "why": "Otsu's method picks the threshold that best separates two classes of pixels."
+  },
+  {
+    "q": "Which filter is best at removing salt-and-pepper noise?",
+    "choices": ["Mean filter", "Median filter", "Sharpening filter", "High-pass filter"],
+    "answer": 1,
+    "why": "The median ignores the extreme black and white outliers."
+  },
+  {
+    "q": "A 3×3 averaging (mean) filter makes an image…",
+    "choices": ["Sharper", "Brighter", "Smoother", "Binary"],
+    "answer": 2,
+    "why": "Averaging neighbours removes fine detail and noise: it is a low-pass filter."
+  },
+  {
+    "q": "A homography maps points between…",
+    "choices": ["Two planes", "Two colours", "Two histograms", "Two filters"],
+    "answer": 0,
+    "why": "It is a 3×3 projective map between two views of a plane, like the screen seen by the camera."
+  },
+  {
+    "q": "How many point pairs do you need, at least, to compute a homography?",
+    "choices": ["2", "3", "4", "8"],
+    "answer": 2,
+    "why": "Each pair gives 2 equations and a homography has 8 unknowns, so 4 pairs."
+  },
+  {
+    "q": "Morphological opening (erosion then dilation) is used to…",
+    "choices": ["Fill holes", "Remove small specks", "Detect edges", "Increase contrast"],
+    "answer": 1,
+    "why": "Erosion deletes small blobs; dilation restores the size of what survived."
+  },
+  {
+    "q": "VisionTouch finds your hand by subtracting which two images?",
+    "choices": ["Left and right camera", "Camera and predicted image", "Red and blue channels", "Two old frames"],
+    "answer": 1,
+    "why": "The engine predicts what the camera should see; whatever differs is in front of the screen."
+  }
+]

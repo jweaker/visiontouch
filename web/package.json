@@ -1,0 +1,26 @@
+{
+  "name": "visiontouch-stage",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5199 --strictPort",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "fake-engine": "node fake-engine.mjs --port 5198"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.5.438"
+  },
+  "devDependencies": {
+    "@fontsource-variable/bricolage-grotesque": "^5.3.0",
+    "@fontsource/atkinson-hyperlegible": "^5.3.0",
+    "@playwright/test": "^1.65.1",
+    "happy-dom": "^21.0.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.1",
+    "ws": "^8.23.0"
+  }
+}
