@@ -298,8 +298,14 @@ class Engine:
         view = getattr(self.server, "view", None)  # the built-in window, absent in browser mode
         if view is not None:
             view.on_top = False
+            before = self.server.window
             view.toggle_fullscreen()
-            time.sleep(2.0)  # the fullscreen animation must finish before the window can be resized
+            # The fullscreen animation must finish before the window can be resized;
+            # the stage reports its new size when it has (slow on a busy machine).
+            end = time.monotonic() + 6
+            while time.monotonic() < end and self.server.window == before:
+                time.sleep(0.1)
+            time.sleep(0.7)
             if mode == "desktop":
                 view.resize(*STRIP)
                 time.sleep(0.5)

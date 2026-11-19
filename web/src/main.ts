@@ -98,14 +98,26 @@ const release = () => {
   clearTimeout(holdTimer)
   home.classList.remove('holding')
 }
-home.addEventListener('pointerdown', () => {
+const hold = () => {
+  if (home.classList.contains('holding')) return
   home.classList.add('holding')
   holdTimer = window.setTimeout(() => {
     release()
     goHome()
   }, 1000)
+}
+const isHand = (e: PointerEvent) => e.pointerType === 'touch' && e.pointerId >= 1000
+home.addEventListener('pointerdown', hold)
+// A mouse or a real touch screen must keep pressing. A hand only has to point at the button
+// for the second: a hold-still tap is far too short to count as a hold, and not every hand
+// can pinch, so its own presses and releases are ignored here.
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave'] as const) home.addEventListener(ev, (e) => isHand(e) || release())
+addEventListener('pointermove', (e) => {
+  if (!isHand(e)) return
+  if (home.contains(e.target as Node)) hold()
+  else release()
 })
-for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) home.addEventListener(ev, release)
+addEventListener('pointercancel', (e) => isHand(e) && release())
 
 // Touch feedback everywhere: a ripple on every press, a pressed state on buttons, and a
 // highlight on whatever a hovering hand points at (hands have no CSS :hover).

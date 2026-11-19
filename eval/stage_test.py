@@ -70,6 +70,15 @@ def main(server):
     results["toolbar switches back to tap"] = engine.tracker.hold is False
     gone()
 
+    # Home: a hand only has to point at the home button for a second (no press).
+    js("location.hash = '#memory'")
+    time.sleep(0.8)
+    x, y = centre("document.querySelector('#home')")
+    for _ in range(45):
+        hand(x, y)
+    results["pointing at home for a second goes home"] = js("location.hash") in ("", "#")
+    gone()
+
     # Settings: the keystone switch reaches the engine.
     js("location.hash = '#settings'")
     time.sleep(0.8)

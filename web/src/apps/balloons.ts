@@ -58,7 +58,9 @@ export const balloons: App = {
       }
     }
     canvas.addEventListener('pointerdown', pop)
-    canvas.addEventListener('pointermove', (e) => e.buttons && pop(e)) // dragging a pressed finger pops too
+    // A hand pops whatever it touches, pressed or not: nobody can hold still on a rising balloon.
+    // A mouse must be pressed (dragging pops too).
+    canvas.addEventListener('pointermove', (e) => (e.buttons || (e.pointerType === 'touch' && e.pointerId >= 1000)) && pop(e))
 
     const stop = loop((dt, now) => {
       if (playing) {

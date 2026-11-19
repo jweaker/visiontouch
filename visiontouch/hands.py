@@ -14,7 +14,7 @@ import numpy as np
 
 LOW, HIGH = 8, 18  # residual thresholds (grey levels): weak evidence, strong evidence
 MIN_AREA = 0.0015  # smallest blob, as a fraction of the working image
-GAP = 9  # pieces closer than this (working pixels) count as one blob
+GAP = 17  # pieces closer than this (working pixels) count as one blob
 THICK = 7  # a blob must be at least this wide somewhere (working pixels)
 SOLID = 5  # parts of a blob narrower than this (working pixels) cannot be the fingertip
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"

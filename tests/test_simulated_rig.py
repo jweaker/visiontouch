@@ -216,8 +216,34 @@ def test_sprites_drifting_behind_a_still_hand_do_not_move_the_pointer():
     assert np.percentile(errors, 90) < 0.03 * W, f"pointer off by {np.percentile(errors, 90):.1f} px (90th percentile)"
 
 
+def test_a_hand_reaching_over_the_launcher_is_found_at_every_tile():
+    """The launcher's tiles have thick dark outlines. Over them a hand cannot
+    be seen, so an arm reaching for a tile is cut into pieces; they must still
+    be read as one arm, with the fingertip on the tile."""
+    launcher = cv2.imread(str(Path(__file__).parent.parent / "web" / "screenshots" / "01-launcher.png"))
+    rig = SimulatedRig()
+    engine = Engine(rig, camera=rig, screen=rig, landmarks=False)
+    assert engine.calibrate(), engine.message
+    rig.content = cv2.warpPerspective(cv2.resize(launcher, (W, H), interpolation=cv2.INTER_AREA), engine.warp, (W, H))
+    tiles = [(0.26, 0.42), (0.62, 0.3), (0.86, 0.3), (0.62, 0.55), (0.86, 0.55), (0.14, 0.8), (0.38, 0.8), (0.62, 0.8), (0.86, 0.8)]
+    missed = []
+    for x, y in tiles:
+        tip = np.array([x * W, y * H])
+        rig.in_front = cv2.warpPerspective(_arm(tip), engine.warp, (W, H))
+        engine.tracker.pointers.clear()
+        errors, end = [], time.monotonic() + 0.8
+        while time.monotonic() < end:
+            pointers = engine.step()
+            if pointers:
+                errors.append(np.hypot(pointers[0]["x"] * W - tip[0], pointers[0]["y"] * H - tip[1]))
+        if not errors or np.median(errors) > 0.02 * W:
+            missed.append((x, y, round(float(np.median(errors))) if errors else None))
+    assert not missed, f"fingertip not found at {missed}"
+
+
 if __name__ == "__main__":
     test_calibrate_then_find_a_fingertip()
+    test_a_hand_reaching_over_the_launcher_is_found_at_every_tile()
     test_the_apps_own_feedback_does_not_disturb_the_pointer()
     test_sprites_drifting_behind_a_still_hand_do_not_move_the_pointer()
     print("ok")
