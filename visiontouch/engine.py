@@ -4,6 +4,7 @@
                  -> hand pose -> tracker -> stage (or OS mouse)
 """
 import json
+import os
 import re
 import time
 from pathlib import Path
@@ -19,7 +20,7 @@ from .predict import SCREEN_SCALE, Predictor
 from .screen import Screen
 from .track import Tracker
 
-STORE = Path.home() / ".visiontouch"
+STORE = Path(os.environ.get("VISIONTOUCH_HOME", Path.home() / ".visiontouch"))  # calibration and logs
 MASK_GRID = (64, 36)
 
 
@@ -47,8 +48,9 @@ class Engine:
     def _open_camera(self, source):
         if getattr(self, "camera", None):
             self.camera.close()
-        self.source = str(source)
-        self.camera = Camera(source)
+        # `source` is normally a string for Camera; tests pass a ready-made camera object.
+        self.source = getattr(source, "name", str(source))
+        self.camera = source if hasattr(source, "read") else Camera(source)
         self._frame_number, self.predictor = 0, None
         saved = STORE / f"calibration_{re.sub(r'[^A-Za-z0-9]', '_', self.source)}.npz"
         self._saved = saved
@@ -130,7 +132,7 @@ class Engine:
         self.warp = correction(best[0], (w, h), frame.shape[1::-1], screen_frame)
         self.server.show(None)
         self.predictor = predictor
-        STORE.mkdir(exist_ok=True)
+        STORE.mkdir(parents=True, exist_ok=True)
         np.savez(self._saved, H=best[0], colour_map=predictor.colour_map, latency=self.latency,
                  screen=self.screen.size, camera=frame.shape[1::-1], warp=self.warp)
         self._send_warp()
@@ -247,7 +249,7 @@ class Engine:
 
     def _handle(self, m):
         if m.get("t") == "log":
-            STORE.mkdir(exist_ok=True)
+            STORE.mkdir(parents=True, exist_ok=True)
             with open(STORE / "log.jsonl", "a") as out:
                 out.write(json.dumps({"time": time.time(), **m}) + "\n")
         elif m.get("t") == "hello":
