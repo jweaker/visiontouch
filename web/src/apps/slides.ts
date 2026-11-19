@@ -21,7 +21,7 @@ export const slides: App = {
       <div class="slides">
         <div class="slides-bar">
           <label class="btn" style="--c:${C.cobalt}">Open PDF<input type="file" accept="application/pdf,.pdf" hidden></label>
-          <button class="btn" data-act="clear" style="--c:${C.white};--fg:${C.ink}">Clear ink</button>
+          <button class="btn" data-act="clear" style="--c:${C.white}">Clear ink</button>
           <span class="slides-name pill"></span>
         </div>
         <div class="slides-page"><canvas class="pdf"></canvas><canvas class="ink"></canvas></div>

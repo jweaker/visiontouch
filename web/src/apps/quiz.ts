@@ -2,8 +2,6 @@
 import questions from '../quiz.json'
 import { C, burst, dialog, shuffle, type App } from '../ui'
 
-const TILE_COLORS = [C.cobalt, C.tomato, C.mint, C.pink]
-
 export const quiz: App = {
   id: 'quiz',
   title: 'Quiz',
@@ -21,7 +19,7 @@ export const quiz: App = {
           <button class="btn big quiz-next" style="--c:${C.cobalt}" hidden>Next →</button>
         </div>
         <div class="quiz-answers">
-          ${TILE_COLORS.map((c, i) => `<button class="answer tap" style="--c:${c}"><b>${'ABCD'[i]}</b><span></span></button>`).join('')}
+          ${[...'ABCD'].map((l) => `<button class="answer tap"><b>${l}</b><span></span></button>`).join('')}
         </div>
       </div>`
     const $ = <T extends Element>(s: string) => root.querySelector<T>(s)!

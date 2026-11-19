@@ -102,17 +102,19 @@ def test_calibrate_then_find_a_fingertip():
     blank = np.full((H, W, 3), 235, np.uint8)
     rig.content = cv2.warpPerspective(blank, engine.warp, (W, H))  # as the stage draws it under keystone
     rig.in_front = cv2.warpPerspective(arm, engine.warp, (W, H))
-    pointers = pointers_after(10)
+    # Watch for two seconds: the fingertip must be found in the right place,
+    # and holding still that long must give exactly one dwell click.
+    engine.tracker.pointers.clear()
+    seen, end = [], time.monotonic() + 2.0
+    while time.monotonic() < end:
+        seen.append(engine.step())
+    pointers = seen[-1]
     assert len(pointers) == 1, pointers
     error = np.hypot(pointers[0]["x"] * W - tip[0], pointers[0]["y"] * H - tip[1])
     assert error < 0.015 * W, f"fingertip off by {error:.1f} px"
-
-    # Holding still long enough gives one dwell click.
-    downs = []
-    end = time.monotonic() + 1.3
-    while time.monotonic() < end:
-        downs.append(engine.step()[0]["down"])
-    assert any(downs) and not downs[0], "no dwell click"
+    downs = [p[0]["down"] for p in seen if p]
+    presses = sum(1 for before, after in zip(downs, downs[1:]) if after and not before)
+    assert presses == 1, f"expected one dwell click, saw {presses}"
 
 
 if __name__ == "__main__":

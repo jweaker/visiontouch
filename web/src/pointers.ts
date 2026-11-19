@@ -39,6 +39,11 @@ const POINTER_ID_BASE = 1000
 // fraction of the window width (hands jitter by 1-2 cm), within CLICK_MS.
 const CLICK_DIST = 0.04
 const CLICK_MS = 1500
+// Dwell click, mirrored from the engine (visiontouch/track.py): a pointing hand that stays within
+// DWELL_RADIUS (normalised content units) for DWELL_MS gets one click from the engine. We only
+// draw the progress; the engine makes the click.
+const DWELL_RADIUS = 0.025
+const DWELL_MS = 800
 
 interface Track {
   hand: Hand
@@ -49,6 +54,10 @@ interface Track {
   downX: number
   downY: number
   ring: HTMLElement
+  anchorX: number // dwell anchor, normalised
+  anchorY: number
+  anchorAt: number
+  armed: boolean // one dwell click per anchor, like the engine
 }
 const tracks = new Map<number, Track>()
 
@@ -89,7 +98,7 @@ function makeRing() {
 }
 
 /** Handle one `pointers` message: list of hands with normalised content-box positions. */
-export function handlePointers(list: EnginePointer[]) {
+export function handlePointers(list: EnginePointer[], now = performance.now()) {
   const W = innerWidth, H = innerHeight
   const dispatch = engine.state?.mode !== 'desktop' // in desktop mode the engine drives the OS mouse
   const seen = new Set<number>()
@@ -99,7 +108,7 @@ export function handlePointers(list: EnginePointer[]) {
     let t = tracks.get(p.id)
     if (!t) {
       const hand: Hand = { id: p.id, pointerId: POINTER_ID_BASE + p.id, x: 0, y: 0, down: false, pose: 'point' }
-      t = { hand, wx: 0, wy: 0, target: null, downAt: 0, downX: 0, downY: 0, ring: makeRing() }
+      t = { hand, wx: 0, wy: 0, target: null, downAt: 0, downX: 0, downY: 0, ring: makeRing(), anchorX: p.x, anchorY: p.y, anchorAt: now, armed: true }
       tracks.set(p.id, t)
       hands.set(hand.pointerId, hand)
     }
@@ -108,20 +117,28 @@ export function handlePointers(list: EnginePointer[]) {
     ;[t.wx, t.wy] = toWindow(t.hand.x, t.hand.y)
     t.ring.className = `ring ${p.down ? 'down' : ''} ${t.hand.pose}`
     t.ring.style.transform = `translate(${t.wx}px, ${t.wy}px)`
+    if (Math.hypot(p.x - t.anchorX, p.y - t.anchorY) > DWELL_RADIUS)
+      Object.assign(t, { anchorX: p.x, anchorY: p.y, anchorAt: now, armed: true })
+    let dwell = t.armed && t.hand.pose === 'point' && !p.down ? (now - t.anchorAt) / DWELL_MS : 0
+    if (dwell >= 1) {
+      t.armed = false // the engine clicks now; the ring empties until the hand moves on
+      dwell = 0
+    }
+    t.ring.style.setProperty('--dwell', dwell.toFixed(3))
     if (!dispatch) return
 
     const under = document.elementFromPoint(t.wx, t.wy) ?? document.documentElement
     const captured = t.target?.isConnected ? t.target : under
     const primary = i === 0
     if (p.down && !wasDown) {
-      Object.assign(t, { target: under, downAt: performance.now(), downX: t.wx, downY: t.wy })
+      Object.assign(t, { target: under, downAt: now, downX: t.wx, downY: t.wy })
       fire('pointerdown', under, t, primary)
     } else if (p.down) {
       fire('pointermove', captured, t, primary)
     } else if (wasDown) {
       fire('pointerup', captured, t, primary)
       const near = Math.hypot(t.wx - t.downX, t.wy - t.downY) < CLICK_DIST * W
-      if ((near || captured.contains(under)) && performance.now() - t.downAt < CLICK_MS) {
+      if ((near || captured.contains(under)) && now - t.downAt < CLICK_MS) {
         captured.dispatchEvent(
           new MouseEvent('click', { bubbles: true, cancelable: true, composed: true, clientX: t.wx, clientY: t.wy, detail: 1 }),
         )

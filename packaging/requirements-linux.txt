@@ -1,0 +1,2 @@
+# Match the version of opencv-contrib-python in uv.lock.
+opencv-contrib-python-headless==5.1.0.95

@@ -1,5 +1,7 @@
 // Regenerates public/sample-deck.pdf (the deck Slides opens by default) with headless Chromium.
 // Run: node scripts/make-sample-deck.mjs
+// No large saturated or dark shapes (see src/style.css): big areas are light tints, the strong
+// colour is only in outlines and small accents.
 import { chromium } from '@playwright/test'
 import { fileURLToPath } from 'node:url'
 import { readFileSync } from 'node:fs'
@@ -23,13 +25,13 @@ const html = `<!doctype html><html><head><style>
 body { margin: 0; }
 section { width: 1920px; height: 1080px; box-sizing: border-box; padding: 120px 150px; background: #FFF6E6; color: #17153B;
   position: relative; overflow: hidden; break-after: page; font-family: Body; }
-.tag { display: inline-block; padding: 12px 34px; border: 6px solid #17153B; border-radius: 999px; background: var(--c); color: #fff;
-  font: 800 44px Display; }
+.tag { display: inline-block; padding: 12px 34px; border: 6px solid #17153B; border-radius: 999px;
+  background: color-mix(in srgb, var(--c) 22%, #fff); box-shadow: inset 0 0 0 8px var(--c); font: 800 44px Display; }
 h1 { font: 800 150px/1 Display; letter-spacing: -0.04em; margin: 60px 0 40px; }
 p { font-size: 58px; line-height: 1.25; max-width: 1400px; margin: 0; }
 .blob { position: absolute; right: -140px; bottom: -140px; width: 560px; height: 560px; border-radius: 50%;
-  border: 8px solid #17153B; background: var(--c); }
-.blob::after { content: ''; position: absolute; inset: 150px; border-radius: 50%; border: 36px solid #fff; }
+  border: 8px solid #17153B; background: color-mix(in srgb, var(--c) 22%, #fff); box-shadow: inset 0 0 0 36px var(--c); }
+.blob::after { content: ''; position: absolute; inset: 150px; border-radius: 50%; border: 36px solid var(--c); }
 </style></head><body>${slides
   .map(([tag, title, text, c]) => `<section style="--c:${c}"><span class="tag">${tag}</span><h1>${title}</h1><p>${text}</p><div class="blob"></div></section>`)
   .join('')}</body></html>`

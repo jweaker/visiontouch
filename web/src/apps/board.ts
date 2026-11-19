@@ -28,6 +28,7 @@ export const board: App = {
           <button class="tool" data-act="clear">Clear</button>
           <button class="tool" data-act="save">Save</button>
         </div>
+        <span class="pill saved" hidden></span>
       </div>`
     const canvas = root.querySelector('canvas')!
     const { ctx, w, h } = fitCanvas(canvas)
@@ -69,14 +70,33 @@ export const board: App = {
       if (act === 'undo') strokes.pop()
       if (act === 'clear') strokes.length = 0
       if (act === 'undo' || act === 'clear') redraw()
-      if (act === 'save') {
+      if (act === 'save') save()
+      sync()
+    })
+
+    // The built-in window can't download files, so the engine stores the picture (POST /save).
+    // In a plain browser without the engine we fall back to a download.
+    const saved = root.querySelector<HTMLElement>('.saved')!
+    let hideSaved = 0
+    async function save() {
+      const png = await new Promise<Blob | null>((r) => canvas.toBlob(r, 'image/png'))
+      let text = 'Saved to your downloads'
+      try {
+        const res = await fetch('/save/board.png', { method: 'POST', body: png, headers: { 'content-type': 'image/png' } })
+        const { path } = await res.json()
+        if (!res.ok || typeof path !== 'string') throw new Error('no engine to save to')
+        text = `Saved to ${path}`
+      } catch {
         const a = document.createElement('a')
         a.download = `visiontouch-board-${Date.now()}.png`
         a.href = canvas.toDataURL('image/png')
         a.click()
       }
-      sync()
-    })
+      saved.textContent = text
+      saved.hidden = false
+      clearTimeout(hideSaved)
+      hideSaved = window.setTimeout(() => (saved.hidden = true), 4000)
+    }
 
     const start = (e: PointerEvent, stroke: Stroke) => {
       live.set(e.pointerId, stroke)
@@ -103,6 +123,6 @@ export const board: App = {
     const end = (e: PointerEvent) => live.delete(e.pointerId)
     canvas.addEventListener('pointerup', end)
     canvas.addEventListener('pointercancel', end)
-    return () => {}
+    return () => clearTimeout(hideSaved)
   },
 }

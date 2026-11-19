@@ -4,7 +4,7 @@ import '@fontsource-variable/bricolage-grotesque/wght.css'
 import '@fontsource/atkinson-hyperlegible/latin-400.css'
 import '@fontsource/atkinson-hyperlegible/latin-700.css'
 import './style.css'
-import { connect, emit, on, send } from './engine'
+import { connect, emit, engine, on, send } from './engine'
 import { setWarp, toMatrix3d } from './warp'
 import { startPointerShim } from './pointers'
 import { apps, launcher } from './apps'
@@ -21,11 +21,35 @@ document.body.append(stage)
 const view = stage.querySelector<HTMLElement>('#view')!
 const home = stage.querySelector<HTMLElement>('#home')!
 
+// Desktop mode: the engine shrinks this window to a small strip and drives the OS mouse.
+// The strip shows one button back, and the keystone warp does not apply to it.
+const back = html(`<button id="back">Back to VisionTouch</button>`)
+back.addEventListener('click', () => send({ t: 'cmd', name: 'mode', value: 'apps' }))
+document.body.append(back)
+let warp: number[] | null = null
+const desktop = () => engine.state?.mode === 'desktop'
+function applyWarp() {
+  const m = desktop() ? null : warp
+  const H = setWarp(m)
+  stage.style.transform = m ? toMatrix3d(H) : '' // outside the content box the body stays black
+}
 on('warp', (m) => {
-  const H = setWarp(m.m)
-  stage.style.transform = m.m ? toMatrix3d(H) : ''
-  document.body.classList.toggle('warped', !!m.m) // area outside the keystoned quad goes dark
+  warp = m.m
+  applyWarp()
 })
+
+// Engine status: desktop mode, and a big toast while calibration is running.
+const toast = html(`<div id="toast" hidden></div>`)
+stage.append(toast)
+function onState() {
+  document.body.classList.toggle('desktop', desktop())
+  applyWarp()
+  const msg = engine.state?.message ?? ''
+  toast.hidden = !msg.startsWith('Calibrating')
+  toast.textContent = msg
+}
+on('state', onState)
+on('connection', onState)
 
 // Calibration patterns: full window, unwarped, above everything, nothing else visible.
 // The image is stretched to the window with pixelated scaling, so a pattern rendered at

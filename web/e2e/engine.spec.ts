@@ -1,6 +1,6 @@
 // The shell end to end through a real WebSocket: hello, pointer shim + rings, pattern overlay, warp.
 import { expect, test } from '@playwright/test'
-import { ENGINE, W, H, engineSend, handTap, received, shot, watchErrors } from './helpers'
+import { ENGINE, W, H, engineSend, handTap, received, shot, state, watchErrors } from './helpers'
 
 test.beforeEach(async ({ page }) => {
   await page.goto(ENGINE)
@@ -107,4 +107,96 @@ test('a hand that disappears mid-press cancels instead of clicking', async ({ pa
   await engineSend(request, { t: 'pointers', p: [] })
   await expect.poll(() => page.evaluate(() => (window as any).seen)).toEqual(['pointerdown', 'pointercancel'])
   await expect(page.locator('#view')).toHaveAttribute('data-app', 'home')
+})
+
+test('the outside of the keystoned content box is black, the box itself is paper', async ({ page, request }) => {
+  await engineSend(request, { t: 'warp', m: [0.8, 0, 192, 0, 0.8, 108, 0, 0, 1] })
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('stage')!).transform)).toContain('matrix')
+  const png = await page.screenshot()
+  const [outside, inside] = await page.evaluate(async (b64) => {
+    const img = new Image()
+    img.src = `data:image/png;base64,${b64}`
+    await img.decode()
+    const c = new OffscreenCanvas(img.width, img.height)
+    const ctx = c.getContext('2d')!
+    ctx.drawImage(img, 0, 0)
+    const at = (x: number, y: number) => [...ctx.getImageData(x, y, 1, 1).data.slice(0, 3)]
+    return [at(20, 20), at(960, 1010)] // window corner; inside the box below the tiles (footer line)
+  }, png.toString('base64'))
+  expect(outside).toEqual([0, 0, 0])
+  expect(Math.min(...inside)).toBeGreaterThan(200)
+  await engineSend(request, { t: 'warp', m: null })
+})
+
+test('the cursor ring fills while a pointing hand holds still', async ({ page, request }, info) => {
+  const dwell = () => page.evaluate(() => Number(document.querySelector<HTMLElement>('.ring')!.style.getPropertyValue('--dwell')))
+  const hold = (x: number) => engineSend(request, { t: 'pointers', p: [{ id: 2, x, y: 0.93, down: false, pose: 'point' }] })
+  await hold(0.5)
+  await page.waitForTimeout(500)
+  await hold(0.505) // jitter inside the 2.5 % radius keeps the anchor
+  const half = await dwell()
+  expect(half).toBeGreaterThan(0.4)
+  expect(half).toBeLessThan(1)
+  await shot(page, info, '23-dwell-ring')
+  await hold(0.6) // moved: starts over
+  expect(await dwell()).toBeLessThan(0.1)
+  await engineSend(request, { t: 'pointers', p: [] })
+})
+
+test('calibration progress shows as a big toast on any screen', async ({ page, request }, info) => {
+  await engineSend(request, state({ message: 'Calibrating: finding the screen' }))
+  await expect(page.locator('#toast')).toHaveText('Calibrating: finding the screen')
+  await shot(page, info, '24-calibrating-toast')
+  await engineSend(request, state({ message: 'Calibration failed: the camera must see the whole projected picture' }))
+  await expect(page.locator('#toast')).toBeHidden()
+  await page.goto(`${ENGINE}/#settings`)
+  await engineSend(request, state({ message: 'Calibration failed: the camera must see the whole projected picture' }))
+  await expect(page.locator('.engine-msg.bad')).toContainText('Calibration failed')
+  await engineSend(request, state())
+})
+
+test('desktop mode: only a back button in the small strip, warp ignored', async ({ page, request }, info) => {
+  const errors = watchErrors(page)
+  await engineSend(request, { t: 'warp', m: [0.8, 0, 192, 0, 0.8, 108, 0, 0, 1] })
+  await page.setViewportSize({ width: 420, height: 110 })
+  await engineSend(request, state({ mode: 'desktop' }))
+  await expect(page.locator('#back')).toBeVisible()
+  await expect(page.locator('#stage')).toBeHidden()
+  await engineSend(request, { t: 'pointers', p: [{ id: 1, x: 0.5, y: 0.5, down: false, pose: 'point' }] })
+  await expect(page.locator('.rings')).toBeHidden()
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('stage')!).transform)).toBe('none')
+  const box = (await page.locator('#back').boundingBox())!
+  expect([box.width, box.height]).toEqual([420, 110])
+  // The label fits on one line, unclipped.
+  expect(await page.locator('#back').evaluate((b) => b.scrollWidth <= b.clientWidth && b.scrollHeight <= b.clientHeight)).toBe(true)
+  await shot(page, info, '25-desktop-strip')
+  await page.locator('#back').click() // the fake engine switches back to apps
+  await expect.poll(async () => (await received(request)).some((m) => m.t === 'cmd' && m.name === 'mode' && m.value === 'apps')).toBe(true)
+  await page.setViewportSize({ width: W, height: H })
+  await expect(page.locator('#stage')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.getElementById('stage')!).transform)).toContain('matrix') // warp is back
+  await engineSend(request, { t: 'warp', m: null })
+  await engineSend(request, { t: 'pointers', p: [] })
+  expect(errors).toEqual([])
+})
+
+test('pipeline streams only the listed stages and closes them on leaving', async ({ page, request }, info) => {
+  const streams = async () => (await request.get(`${ENGINE}/fake/streams`)).json()
+  await request.post(`${ENGINE}/fake/stages`, { data: JSON.stringify(['camera', 'residual', 'mask']) })
+  try {
+    await page.goto(`${ENGINE}/#pipeline`)
+    await expect(page.locator('.stages img')).toHaveCount(3)
+    await expect(page.locator('figure[data-stage=camera] img')).toBeVisible()
+    await expect(page.locator('figure[data-stage=predicted] .placeholder')).toHaveText('This stage is not running')
+    await expect.poll(streams).toBe(3)
+    // Pipeline order, left to right and top to bottom.
+    expect(await page.locator('figure').evaluateAll((f) => f.map((e) => (e as HTMLElement).dataset.stage))).toEqual([
+      'camera', 'rectified', 'predicted', 'residual', 'mask', 'overlay',
+    ])
+    await shot(page, info, '12-pipeline')
+    await page.evaluate(() => (location.hash = ''))
+    await expect.poll(streams).toBe(0)
+  } finally {
+    await request.post(`${ENGINE}/fake/stages`, { data: '[]' })
+  }
 })

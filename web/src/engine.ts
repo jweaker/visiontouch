@@ -7,6 +7,7 @@ export interface EngineState {
   fps: number
   latency_ms: number
   mode: 'apps' | 'desktop'
+  keystone: boolean
   message: string
 }
 

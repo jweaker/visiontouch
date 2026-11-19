@@ -1,0 +1,118 @@
+name: Desktop builds
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-arm64
+            runner: macos-15
+            archive: VisionTouch-macos-arm64.zip
+          - platform: windows-x64
+            runner: windows-2025
+            archive: VisionTouch-windows-x64.zip
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            archive: VisionTouch-linux-x64.tar.gz
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          python-version: '3.14.8'
+          enable-cache: true
+          cache-dependency-glob: |
+            uv.lock
+            packaging/requirements*.txt
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: pnpm/action-setup@v6
+        with:
+          version: '12.8.1'
+          package_json_file: web/package.json
+          cache: true
+          cache_dependency_path: web/pnpm-lock.yaml
+      - name: Build stage
+        working-directory: web
+        run: pnpm install --frozen-lockfile && pnpm build
+      - name: Install Python dependencies
+        run: |
+          uv sync --locked --no-dev
+          uv pip install -r packaging/requirements.txt
+      - name: Install Linux native libraries and headless OpenCV
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libegl1 libgles2
+          uv pip uninstall opencv-contrib-python
+          uv pip install -r packaging/requirements-linux.txt --no-deps --only-binary :all:
+      - name: Run headless tests
+        run: |
+          uv run --no-sync python tests/test_simulated_rig.py
+          uv run --no-sync python -m visiontouch.calibrate
+          uv run --no-sync python -m visiontouch.hands
+          uv run --no-sync python -m visiontouch.track
+          uv run --no-sync python -m visiontouch.keystone
+      - name: Freeze and archive
+        run: uv run --no-sync pyinstaller --noconfirm --distpath packaging/dist --workpath packaging/build packaging/VisionTouch.spec
+      - name: Check the macOS bundle
+        if: runner.os == 'macOS'
+        run: packaging/dist/VisionTouch.app/Contents/MacOS/VisionTouch --check
+      - name: Check the Windows bundle
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $process = Start-Process -FilePath ./packaging/dist/VisionTouch/VisionTouch.exe -ArgumentList '--check', '--check-log', 'visiontouch-check.log' -Wait -PassThru
+          Get-Content visiontouch-check.log
+          exit $process.ExitCode
+      - name: Check the Linux bundle
+        if: runner.os == 'Linux'
+        run: packaging/dist/VisionTouch/VisionTouch --check
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform }}
+          path: packaging/dist/${{ matrix.archive }}
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: release
+          merge-multiple: true
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --latest \
+            release/VisionTouch-macos-arm64.zip \
+            release/VisionTouch-windows-x64.zip \
+            release/VisionTouch-linux-x64.tar.gz

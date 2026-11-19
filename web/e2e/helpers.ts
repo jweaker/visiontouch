@@ -22,6 +22,9 @@ export async function received(request: APIRequestContext): Promise<any[]> {
   return (await request.get(`${ENGINE}/fake/received`)).json()
 }
 
+/** A full engine state message with the fake engine's defaults. */
+export const state = (o: object = {}) => ({ t: 'state', calibrated: true, camera: 'Fake camera', fps: 30, latency_ms: 95, mode: 'apps', keystone: true, message: '', ...o })
+
 const frame = () => new Promise((r) => setTimeout(r, 40)) // engine sends ~30 messages/s
 
 /** A hand at content-box pixel positions: hover, press, (move), release. */

@@ -1,4 +1,5 @@
-// Pipeline view: every stage of the image-processing pipeline, live, with a plain caption.
+// Pipeline view: every stage of the image-processing pipeline, live, in pipeline order, with a
+// plain caption. One MJPEG stream per stage the engine lists in GET /debug/stages.
 import { engine, on } from '../engine'
 import { C, type App } from '../ui'
 
@@ -31,6 +32,10 @@ export const pipeline: App = {
         </div>
       </div>`
 
+    // Stop streams by clearing src: removing the <img> alone may leave the connection open,
+    // and browsers allow only six connections per host.
+    const stopStreams = () => root.querySelectorAll('img').forEach((img) => (img.src = ''))
+
     // Only ask the engine for streams when it's connected; otherwise show friendly placeholders.
     let alive = true
     async function load() {
@@ -44,6 +49,7 @@ export const pipeline: App = {
         }
       }
       if (!alive) return
+      stopStreams()
       root.querySelectorAll<HTMLElement>('figure').forEach((fig) => {
         const id = fig.dataset.stage!
         fig.querySelector('.frame')!.innerHTML = live.includes(id)
@@ -56,8 +62,7 @@ export const pipeline: App = {
     return () => {
       alive = false
       off()
-      // Stop the MJPEG streams explicitly; some browsers keep them open otherwise.
-      root.querySelectorAll('img').forEach((img) => img.removeAttribute('src'))
+      stopStreams()
     }
   },
 }

@@ -13,7 +13,7 @@ import { settings } from './settings'
 
 export const apps: App[] = [board, balloons, catchGame, slides, quiz, memory, accuracy, pipeline, settings]
 
-// Light tile colours need dark text.
+// Light colours need a dark icon on the tile's icon chip.
 const fg = (color: string) => ([C.sun, C.white, C.sky].includes(color) ? C.ink : C.white)
 
 function statusText() {

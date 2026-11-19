@@ -16,12 +16,13 @@ from .calibrate import colour_tiles, find_homography, marker_pattern
 from .camera import Camera
 from .hands import Landmarker, clean_mask, find_tips, read_pose
 from .keystone import correction, find_frame
-from .predict import SCREEN_SCALE, Predictor
+from .predict import Predictor
 from .screen import Screen
 from .track import Tracker
 
 STORE = Path(os.environ.get("VISIONTOUCH_HOME", Path.home() / ".visiontouch"))  # calibration and logs
 MASK_GRID = (64, 36)
+STRIP = (420, 110)  # size of the stage window in desktop mode
 
 
 def _apply(matrix, point):
@@ -73,11 +74,16 @@ class Engine:
                           "fps": round(self.fps, 1), "latency_ms": round(self.latency * 1000), "mode": self.mode,
                           "keystone": self.keystone, "message": self.message})
 
+    def _content(self):
+        """Content box pixels -> screen pixels: the keystone correction while
+        the stage is fullscreen, nothing in desktop mode or when switched off."""
+        return self.warp if self.keystone and self.mode == "apps" else np.eye(3)
+
     def _send_warp(self):
         """Tell the stage how to pre-distort its content box (keystone correction)."""
         if self.predictor is not None:
-            self.predictor.set_area(self.warp if self.keystone else np.eye(3))
-        if not self.keystone or self.predictor is None or not self.server.window:
+            self.predictor.set_area(self._content())
+        if self.predictor is None or not self.server.window or np.allclose(self._content(), np.eye(3)):
             return self.server.send({"t": "warp", "m": None})
         # The matrix is in screen pixels; the stage works in window (CSS) pixels.
         scale = np.diag([self.server.window[0] / self.screen.size[0], self.server.window[1] / self.screen.size[1], 1.0])
@@ -85,13 +91,12 @@ class Engine:
 
     def _to_content(self, screen_point):
         """Screen pixels -> position in the content box, 0..1."""
-        matrix = np.linalg.inv(self.warp) if self.keystone else np.eye(3)
-        return _apply(matrix, screen_point) / self.screen.size
+        return _apply(np.linalg.inv(self._content()), screen_point) / self.screen.size
 
     def _to_screen(self, pointer):
         """A pointer (content box, 0..1) -> screen pixels."""
         point = (pointer["x"] * self.screen.size[0], pointer["y"] * self.screen.size[1])
-        return _apply(self.warp, point) if self.keystone else np.array(point)
+        return _apply(self._content(), point)
 
     def _fresh_frame(self, wait):
         """A camera frame taken after waiting `wait` seconds (lets a new pattern arrive)."""
@@ -120,10 +125,11 @@ class Engine:
         self._say("Calibrating: learning colours")
         pairs = []
         for seed in range(4):
-            tiles = colour_tiles(w, h, seed)
-            self.server.show(tiles)
-            small = cv2.resize(tiles, None, fx=SCREEN_SCALE, fy=SCREEN_SCALE, interpolation=cv2.INTER_AREA)
-            pairs.append((small, self._fresh_frame(0.9 if seed == 0 else 0.6)))
+            self.server.show(colour_tiles(w, h, seed))
+            frame = self._fresh_frame(0.9 if seed == 0 else 0.6)
+            # Pair the photo with a screenshot rather than with the pattern itself:
+            # a notification or dialog on top of the pattern is then accounted for.
+            pairs.append((self.screen.latest()[1], frame))
         predictor.calibrate_colour(pairs)
         self.latency = self._measure_latency(predictor)  # leaves a white screen up
         # Keystone: look for the projection screen's frame around the white picture.
@@ -201,8 +207,7 @@ class Engine:
             self._drive_mouse(pointers)
         self._count += 1
         if self.mask_wanted and self._count % 2 == 0:
-            to_content = np.linalg.inv(self.warp) if self.keystone else np.eye(3)
-            to_grid = np.diag([MASK_GRID[0] / self.screen.size[0], MASK_GRID[1] / self.screen.size[1], 1.0]) @ to_content @ np.linalg.inv(p.screen_to_work)
+            to_grid = np.diag([MASK_GRID[0] / self.screen.size[0], MASK_GRID[1] / self.screen.size[1], 1.0]) @ np.linalg.inv(self._content()) @ np.linalg.inv(p.screen_to_work)
             grid = cv2.warpPerspective(mask.astype(np.uint8) * 255, to_grid, MASK_GRID, flags=cv2.INTER_AREA)
             self.server.send({"t": "mask", "w": MASK_GRID[0], "h": MASK_GRID[1], "b64": __import__("base64").b64encode(np.where(grid > 60, 255, 0).astype(np.uint8).tobytes()).decode()})
         if self._count % 3 == 0:
@@ -247,6 +252,23 @@ class Engine:
             (self.mouse.mouseDown if first["down"] else self.mouse.mouseUp)()
             self._mouse_down = first["down"]
 
+    def _set_mode(self, mode):
+        """apps: the stage is fullscreen and receives the pointers. desktop: the
+        stage shrinks to a small strip that stays on top (it holds the button
+        to come back) and the pointers drive the OS mouse."""
+        self.mode = mode
+        view = getattr(self.server, "view", None)  # the built-in window, absent in browser mode
+        if view is not None:
+            view.on_top = False
+            view.toggle_fullscreen()
+            time.sleep(2.0)  # the fullscreen animation must finish before the window can be resized
+            if mode == "desktop":
+                view.resize(*STRIP)
+                time.sleep(0.5)
+                view.move(self.screen.origin[0] + (self.screen.size[0] - STRIP[0]) // 2, self.screen.origin[1] + 40)
+                view.on_top = True
+        self._send_warp()
+
     def _handle(self, m):
         if m.get("t") == "log":
             STORE.mkdir(parents=True, exist_ok=True)
@@ -259,8 +281,8 @@ class Engine:
             name, value = m.get("name"), m.get("value")
             if name == "calibrate":
                 self.calibrate()
-            elif name == "mode" and value in ("apps", "desktop"):
-                self.mode = value
+            elif name == "mode" and value in ("apps", "desktop") and value != self.mode:
+                self._set_mode(value)
             elif name == "subscribe_mask":
                 self.mask_wanted = bool(value)
             elif name == "keystone":

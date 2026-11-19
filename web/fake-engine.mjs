@@ -4,9 +4,13 @@
 //   node fake-engine.mjs --port 5198 --demo   then open http://127.0.0.1:5198/
 //
 // --demo plays a loop: a hand circling (pressing every few seconds), a calibration pattern,
-// then a keystone warp. Tests drive it instead through two extra endpoints:
+// then a keystone warp. Tests drive it instead through a few extra endpoints:
 //   POST /fake/send      body = one protocol message (JSON), broadcast to every stage
-//   GET  /fake/received  every message the stages sent us, as a JSON array
+//   GET  /fake/received  every message the stages sent us, as a JSON array; POST /save/<name>.png
+//                        shows up there as {t: "save", name, bytes, png}
+//   POST /fake/stages    body = JSON array: the pipeline stages GET /debug/stages lists
+//   GET  /fake/streams   how many /debug/<stage>.mjpg streams are open right now
+// The `mode` and `keystone` commands change the state like the real engine does.
 import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -22,17 +26,47 @@ const types = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
 
 const received = []
 let size = { w: 1920, h: 1080 }
+let stages = []
+let streams = 0
+const state = { t: 'state', calibrated: true, camera: 'Fake camera', fps: 30, latency_ms: 95, mode: 'apps', keystone: true, message: '' }
+const read = async (req) => {
+  const chunks = []
+  for await (const chunk of req) chunks.push(chunk)
+  return Buffer.concat(chunks)
+}
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
   if (url.pathname === '/fake/send' && req.method === 'POST') {
-    let body = ''
-    for await (const chunk of req) body += chunk
-    broadcast(JSON.parse(body))
+    broadcast(JSON.parse(String(await read(req))))
     return res.end('ok')
   }
   if (url.pathname === '/fake/received') return json(res, received)
-  if (url.pathname === '/debug/stages') return json(res, [])
+  if (url.pathname === '/fake/stages' && req.method === 'POST') {
+    stages = JSON.parse(String(await read(req)))
+    return res.end('ok')
+  }
+  if (url.pathname === '/fake/streams') return json(res, streams)
+  if (url.pathname === '/debug/stages') return json(res, stages)
+  const stream = url.pathname.match(/^\/debug\/(\w+)\.mjpg$/)
+  if (stream && stages.includes(stream[1])) {
+    // Like the real engine: multipart/x-mixed-replace that never ends (PNG frames, as we have no JPEG encoder).
+    streams++
+    res.writeHead(200, { 'content-type': 'multipart/x-mixed-replace; boundary=frame' })
+    const frame = () => res.write(Buffer.concat([Buffer.from('--frame\r\nContent-Type: image/png\r\n\r\n'), checkerboard(320, 180, 20), Buffer.from('\r\n')]))
+    frame()
+    const timer = setInterval(frame, 500)
+    return res.on('close', () => {
+      clearInterval(timer)
+      streams--
+    })
+  }
+  const save = url.pathname.match(/^\/save\/([\w-]+)\.png$/)
+  if (save && req.method === 'POST') {
+    const body = await read(req)
+    received.push({ t: 'save', name: save[1], bytes: body.length, png: body.subarray(1, 4).toString() === 'PNG' })
+    return json(res, { path: `/Users/fake/Pictures/VisionTouch/${save[1]}-20261120-120000.png` })
+  }
   const pattern = url.pathname.match(/^\/pattern\/(\d+)\.png$/)
   if (pattern) {
     res.writeHead(200, { 'content-type': 'image/png' })
@@ -59,8 +93,12 @@ wss.on('connection', (ws) => {
     const msg = JSON.parse(String(data))
     received.push(msg)
     if (msg.t === 'hello') size = { w: msg.w, h: msg.h }
+    if (msg.t === 'cmd' && (msg.name === 'mode' || msg.name === 'keystone')) {
+      state[msg.name] = msg.value
+      broadcast(state)
+    }
   })
-  ws.send(JSON.stringify({ t: 'state', calibrated: true, camera: 'Fake camera', fps: 30, latency_ms: 95, mode: 'apps', message: '' }))
+  ws.send(JSON.stringify(state))
 })
 
 // Grayscale checkerboard PNG, written by hand so we need no image library.
@@ -104,7 +142,7 @@ if (demo) {
   let step = 0
   setInterval(() => {
     const phase = step++ % 20
-    broadcast({ t: 'state', calibrated: true, camera: 'Fake camera', fps: 30, latency_ms: 95, mode: 'apps', message: '' })
+    broadcast(state)
     if (phase === 12) broadcast({ t: 'pattern', id: 7, url: '/pattern/7.png' })
     if (phase === 14) {
       broadcast({ t: 'pattern', id: 8, url: null })

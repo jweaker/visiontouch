@@ -1,6 +1,6 @@
 // Opens every app through the fake engine (hand input) and the mouse, with zero console errors.
 import { expect, test } from '@playwright/test'
-import { ENGINE, centre, engineSend, handStroke, handTap, handTapOn, holdHome, received, shot, watchErrors } from './helpers'
+import { ENGINE, centre, engineSend, handStroke, handTap, handTapOn, holdHome, received, shot, state, watchErrors } from './helpers'
 
 test('every app works by hand and by mouse', async ({ page, request }, info) => {
   test.setTimeout(180_000)
@@ -32,6 +32,10 @@ test('every app works by hand and by mouse', async ({ page, request }, info) => 
     return n
   })
   expect(inked).toBeGreaterThan(2000)
+  // Save goes to the engine (the built-in window cannot download) and shows where it went.
+  await handTapOn(page, request, '[data-act=save]')
+  await expect(page.locator('.saved')).toContainText('Pictures/VisionTouch/board-')
+  expect((await received(request)).filter((m) => m.t === 'save')).toContainEqual(expect.objectContaining({ name: 'board', png: true }))
   await shot(page, info, '02-board')
   await holdHome(page)
 
@@ -127,18 +131,34 @@ test('every app works by hand and by mouse', async ({ page, request }, info) => 
   // Pipeline: engine connected but no live stages.
   await open('pipeline')
   await expect(page.locator('.placeholder').first()).toHaveText('This stage is not running')
-  await shot(page, info, '12-pipeline')
   await holdHome(page)
 
   // Settings: live values and commands.
   await open('settings')
   await expect(page.locator('.settings dl')).toContainText('Fake camera')
   await handTapOn(page, request, '[data-cmd=calibrate]')
-  await page.locator('[data-mode=desktop]').click()
+  // The keystone switch flips the engine's setting; the fake engine answers with a new state.
+  const keystone = page.locator('[data-keystone]')
+  await expect(keystone).toHaveAttribute('aria-checked', 'true')
+  await handTapOn(page, request, '[data-keystone]')
+  await expect(keystone).toHaveAttribute('aria-checked', 'false')
+  await engineSend(request, state({ keystone: false, message: 'Calibrated: 48 markers, 1.3 px error, 110 ms delay, squared to the screen frame' }))
+  await expect(page.locator('.engine-msg')).toContainText('1.3 px error')
   await shot(page, info, '13-settings')
+  await keystone.click()
+  await expect(keystone).toHaveAttribute('aria-checked', 'true')
+  // Desktop mode: the stage turns into a single "back" button; pressing it returns to apps.
+  await page.locator('[data-mode=desktop]').click()
+  await expect(page.locator('#back')).toBeVisible()
+  await expect(page.locator('#stage')).toBeHidden()
+  await page.locator('#back').click()
+  await expect(page.locator('#stage')).toBeVisible()
   const cmds = (await received(request)).filter((m) => m.t === 'cmd')
   expect(cmds).toContainEqual({ t: 'cmd', name: 'calibrate' })
+  expect(cmds).toContainEqual({ t: 'cmd', name: 'keystone', value: false })
+  expect(cmds).toContainEqual({ t: 'cmd', name: 'keystone', value: true })
   expect(cmds).toContainEqual({ t: 'cmd', name: 'mode', value: 'desktop' })
+  expect(cmds).toContainEqual({ t: 'cmd', name: 'mode', value: 'apps' })
   await holdHome(page)
 
   // Home button: a short press must not leave the app.
