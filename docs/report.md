@@ -4,7 +4,7 @@ Digital Image Processing, course project report.
 Team: [Member 1], [Member 2], [Member 3], [Member 4], [Member 5].
 
 <!-- BEGIN generated -->
-_Numbers generated 2026-11-20 01:05 from `runs/figures/results.json` and the rig reports by `eval/fill_report.py`._
+_Numbers generated 2026-11-20 01:51 from `runs/figures/results.json` and the rig reports by `eval/fill_report.py`._
 <!-- END generated -->
 
 ## Summary
@@ -12,7 +12,7 @@ _Numbers generated 2026-11-20 01:05 from `runs/figures/results.json` and the rig
 VisionTouch turns an ordinary projector and an ordinary camera (a laptop webcam or a phone) into a touch surface. The camera watches the projected picture. Because the computer knows what it is projecting, it can predict what the camera should see; whatever differs is a hand or its shadow. From that difference we find the fingertip, read the hand's pose, and send touches to our own apps or to the computer's mouse.
 
 <!-- BEGIN headline -->
-- **Webcam, recorded dataset (synthetic hands):** 6.1 % of clean pixels wrongly flagged (plain subtraction: 91.2 %); hand found in 88 % of frames; median fingertip error 11.9 px (0.62 % of the screen width).
+- **Webcam, recorded dataset (synthetic hands):** 6.1 % of clean pixels wrongly flagged (plain subtraction: 91.2 %); hand found in 88 % of frames; median fingertip error 12.1 px (0.63 % of the screen width).
 - **Phone, recorded dataset (synthetic hands):** 3.7 % of clean pixels wrongly flagged (plain subtraction: 97.5 %); hand found in 89 % of frames; median fingertip error 10.1 px (0.52 % of the screen width).
 - **Live rig, Webcam:** no false hand on the clean pictures; median pointer error within 20 px in 12 of 16 picture-and-hand cases; worst 73 px on `slide_light`.
 - **Live rig, Webcam, washed-out picture:** no false hand on the clean pictures; median pointer error within 20 px in 10 of 13 picture-and-hand cases; worst 280 px on `text`.
@@ -197,10 +197,10 @@ The colour map alone does not help, because the camera's exposure at test time d
 <!-- BEGIN sweep -->
 | Camera | LOW / HIGH | Clean pixels flagged | Clean frames with a false hand | Hand pixels found | Hand found |
 |---|---|---|---|---|---|
-| Webcam | 3.2 / 7.2 | 20.4 % | 54 % | 94 % | 99 % |
-| Webcam | 4.4 / 9.9 | 14.6 % | 48 % | 93 % | 96 % |
-| Webcam | 5.6 / 12.6 | 11.4 % | 36 % | 90 % | 92 % |
-| Webcam | 6.8 / 15.3 | 7.8 % | 30 % | 88 % | 90 % |
+| Webcam | 3.2 / 7.2 | 20.3 % | 54 % | 94 % | 99 % |
+| Webcam | 4.4 / 9.9 | 14.5 % | 48 % | 93 % | 96 % |
+| Webcam | 5.6 / 12.6 | 11.4 % | 36 % | 90 % | 93 % |
+| Webcam | 6.8 / 15.3 | 7.8 % | 30 % | 88 % | 92 % |
 | Webcam | 8.0 / 18.0 (chosen) | 6.1 % | 30 % | 86 % | 88 % |
 | Webcam | 10.0 / 22.5 | 3.9 % | 22 % | 87 % | 91 % |
 | Webcam | 12.0 / 27.0 | 3.0 % | 23 % | 83 % | 89 % |
@@ -213,8 +213,8 @@ The colour map alone does not help, because the camera's exposure at test time d
 | Phone | 6.8 / 15.3 | 4.7 % | 39 % | 87 % | 91 % |
 | Phone | 8.0 / 18.0 (chosen) | 3.7 % | 39 % | 86 % | 89 % |
 | Phone | 10.0 / 22.5 | 1.8 % | 23 % | 83 % | 85 % |
-| Phone | 12.0 / 27.0 | 1.5 % | 19 % | 80 % | 82 % |
-| Phone | 16.0 / 36.0 | 0.9 % | 13 % | 77 % | 79 % |
+| Phone | 12.0 / 27.0 | 1.5 % | 19 % | 79 % | 83 % |
+| Phone | 16.0 / 36.0 | 0.8 % | 13 % | 77 % | 80 % |
 | Phone | 20.0 / 45.0 | 0.4 % | 4 % | 72 % | 75 % |
 | Phone | 24.0 / 54.0 | 0.1 % | 4 % | 64 % | 64 % |
 <!-- END sweep -->
@@ -234,10 +234,10 @@ The offline counts are per single frame, before the tracker's three-frame confir
 | plain colours and patterns | Phone | 2.6 % | 27 % | 85 % | 90 % | 9 px |
 | slides and text | Webcam | 7.5 % | 33 % | 100 % | 90 % | 5 px |
 | slides and text | Phone | 3.1 % | 33 % | 100 % | 96 % | 7 px |
-| drawings and games | Webcam | 0.7 % | 0 % | 100 % | 100 % | 6 px |
+| drawings and games | Webcam | 0.7 % | 0 % | 100 % | 100 % | 7 px |
 | drawings and games | Phone | 0.4 % | 0 % | 100 % | 100 % | 10 px |
-| photos and desktop | Webcam | 16.5 % | 86 % | 95 % | 75 % | 90 px |
-| photos and desktop | Phone | 6.6 % | 71 % | 86 % | 64 % | 104 px |
+| photos and desktop | Webcam | 16.5 % | 86 % | 95 % | 75 % | 184 px |
+| photos and desktop | Phone | 6.6 % | 71 % | 86 % | 64 % | 98 px |
 <!-- END per_class -->
 
 ![Per picture](figures/per_picture.png)
@@ -247,18 +247,18 @@ The offline counts are per single frame, before the tracker's three-frame confir
 <!-- BEGIN per_picture -->
 | Picture | Class | Webcam: clean pixels flagged | Webcam: hand found | Webcam: median tip error | Phone: clean pixels flagged | Phone: hand found | Phone: median tip error |
 |---|---|---|---|---|---|---|---|
-| photo1 | photos and desktop | 45.8 % | 100 % | 592 px | 9.6 % | 100 % | 389 px |
-| photo5 | photos and desktop | 34.8 % | 100 % | 604 px | 28.8 % | 100 % | 800 px |
-| slide_dark | slides and text | 22.6 % | 100 % | 47 px | 9.3 % | 100 % | 493 px |
+| photo1 | photos and desktop | 45.8 % | 100 % | 722 px | 9.6 % | 100 % | 389 px |
+| photo5 | photos and desktop | 34.8 % | 100 % | 838 px | 28.8 % | 100 % | 800 px |
+| slide_dark | slides and text | 22.6 % | 100 % | 341 px | 9.3 % | 100 % | 59 px |
 | black | plain colours and patterns | 0.0 % | 0 % | – | 15.9 % | 50 % | 490 px |
-| photo4 | photos and desktop | 15.5 % | 100 % | 420 px | 1.7 % | 100 % | 178 px |
+| photo4 | photos and desktop | 15.5 % | 100 % | 533 px | 1.7 % | 100 % | 178 px |
 | desktop | photos and desktop | 15.3 % | 50 % | 18 px | 4.3 % | 50 % | 31 px |
-| colour_ramp | plain colours and patterns | 0.0 % | 67 % | 6 px | 9.7 % | 100 % | 379 px |
+| colour_ramp | plain colours and patterns | 0.0 % | 67 % | 6 px | 9.7 % | 100 % | 696 px |
 | dark | plain colours and patterns | 0.0 % | 100 % | 8 px | 2.6 % | 100 % | 4 px |
-| photo6 | photos and desktop | 2.4 % | 100 % | 57 px | 0.0 % | 100 % | 94 px |
-| photo3 | photos and desktop | 0.5 % | 100 % | 15 px | 1.7 % | 100 % | 6 px |
-| balloons | drawings and games | 1.4 % | 100 % | 10 px | 0.8 % | 100 % | 14 px |
-| photo2 | photos and desktop | 0.9 % | 50 % | 472 px | 0.0 % | 50 % | 800 px |
+| photo6 | photos and desktop | 2.4 % | 100 % | 58 px | 0.0 % | 100 % | 53 px |
+| photo3 | photos and desktop | 0.5 % | 100 % | 15 px | 1.7 % | 100 % | 7 px |
+| balloons | drawings and games | 1.4 % | 100 % | 10 px | 0.8 % | 100 % | 15 px |
+| photo2 | photos and desktop | 0.9 % | 50 % | 99 px | 0.0 % | 50 % | 800 px |
 | board | drawings and games | 0.0 % | 100 % | 5 px | 0.0 % | 100 % | 7 px |
 | checker | plain colours and patterns | 0.0 % | 100 % | 33 px | 0.0 % | 0 % | – |
 | green | plain colours and patterns | 0.0 % | 100 % | 4 px | 0.0 % | 100 % | 9 px |
@@ -345,9 +345,9 @@ The live tests count pointers after the tracker, which reports a hand only after
 <!-- BEGIN latency -->
 | Camera | Camera + projector delay (calibration) | Engine step, live (median) | Residual only, offline (median) |
 |---|---|---|---|
-| Webcam | 184 ms | 37 ms | 31 ms |
+| Webcam | 184 ms | 37 ms | 21 ms |
 | Webcam, washed-out picture | 219 ms | 38 ms | – |
-| Phone | 165 ms | 41 ms | 27 ms |
+| Phone | 165 ms | 41 ms | 24 ms |
 <!-- END latency -->
 
 The largest share of the delay is the camera and projector, measured at calibration by flashing the screen and timing when the change appears in the screenshots and in the camera. The tracker predicts 60 ms ahead to hide part of it.
@@ -359,8 +359,8 @@ The largest share of the delay is the camera and projector, measured at calibrat
 <!-- BEGIN fingertip -->
 | Camera | Frames with a hand | Hand found | Median error (px) | Median (% of width) | 90th percentile (px) | Found tips within 20 px |
 |---|---|---|---|---|---|---|
-| Webcam | 138 | 88 % | 11.9 | 0.62 % | 496 | 60 % |
-| Phone | 138 | 89 % | 10.1 | 0.52 % | 767 | 65 % |
+| Webcam | 138 | 88 % | 12.1 | 0.63 % | 622 | 58 % |
+| Phone | 138 | 89 % | 10.1 | 0.52 % | 682 | 67 % |
 <!-- END fingertip -->
 
 **Real hands (Accuracy app):**
@@ -380,10 +380,10 @@ We ran MediaPipe Hands on the synthetic-hand frames: on the whole camera frame, 
 |---|---|---|
 | clean frame, whole image | 0 / 23 | 1 / 23 |
 | synthetic hand, whole image | 0 / 46 | 1 / 46 |
-| synthetic hand, engine's crop | 2 / 46 | 1 / 46 |
-| synthetic hand, crop at the true tip | 4 / 46 | 1 / 46 |
+| synthetic hand, engine's crop | 2 / 46 | 2 / 46 |
+| synthetic hand, crop at the true tip | 3 / 46 | 1 / 46 |
 
-Time per call on this laptop (median): Webcam: whole frame 14 ms, crop 14 ms; Phone: whole frame 14 ms, crop 14 ms.
+Time per call on this laptop (median): Webcam: whole frame 13 ms, crop 13 ms; Phone: whole frame 13 ms, crop 13 ms.
 <!-- END mediapipe -->
 
 MediaPipe almost never fires on the synthetic hands, which is expected: they are flat paintings without fingers' shading or knuckles. This shows only that the learned detector cannot replace the classical one *on this test*. A fair comparison needs real hands and will be done with the Accuracy app. Two points do not depend on that test: the classical pipeline ignores anything that is part of the projected picture (a photo of a hand on a slide), and MediaPipe is needed anyway for the pose (pinch, palm), which the classical pipeline cannot read.

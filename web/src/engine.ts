@@ -8,6 +8,7 @@ export interface EngineState {
   latency_ms: number
   mode: 'apps' | 'desktop'
   keystone: boolean
+  sensitivity?: number // detection sensitivity, 1 = default
   message: string
 }
 

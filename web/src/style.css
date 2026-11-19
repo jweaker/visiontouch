@@ -501,9 +501,11 @@ body.desktop #back {
 .panel h2:first-child { margin-top: 0; }
 .panel p { margin: -0.3rem 0 1rem; }
 .panel dl { display: grid; grid-template-columns: auto 1fr; gap: 0.7rem 1.4rem; margin: 0; font-size: 1.3rem; }
-.panel dt { font-weight: 700; }
+.panel dt { font-weight: 700; white-space: nowrap; }
 .panel dd { margin: 0; }
 .segmented, .row { display: flex; align-items: center; gap: 1rem; }
+.pair { display: flex; flex-wrap: wrap; gap: 0 2.4rem; }
+.pair h2 { margin-top: 1rem !important; }
 .panel .engine-msg {
   margin: 0 0 1.2rem;
   padding: 0.9rem 1.2rem;

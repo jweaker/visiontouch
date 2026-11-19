@@ -188,8 +188,8 @@ How to read it: the colour map alone does not help, because the camera's exposur
 <!-- BEGIN fingertip -->
 | Camera | Frames with a hand | Hand found | Median error (px) | Median (% of width) | 90th percentile (px) | Found tips within 20 px |
 |---|---|---|---|---|---|---|
-| Webcam | 138 | 88 % | 11.9 | 0.62 % | 496 | 60 % |
-| Phone | 138 | 89 % | 10.1 | 0.52 % | 767 | 65 % |
+| Webcam | 138 | 88 % | 12.1 | 0.63 % | 622 | 58 % |
+| Phone | 138 | 89 % | 10.1 | 0.52 % | 682 | 67 % |
 <!-- END fingertip -->
 
 ## 7. Hand pose with MediaPipe
@@ -211,10 +211,10 @@ How to read it: the colour map alone does not help, because the camera's exposur
 |---|---|---|
 | clean frame, whole image | 0 / 23 | 1 / 23 |
 | synthetic hand, whole image | 0 / 46 | 1 / 46 |
-| synthetic hand, engine's crop | 2 / 46 | 1 / 46 |
-| synthetic hand, crop at the true tip | 4 / 46 | 1 / 46 |
+| synthetic hand, engine's crop | 2 / 46 | 2 / 46 |
+| synthetic hand, crop at the true tip | 3 / 46 | 1 / 46 |
 
-Time per call on this laptop (median): Webcam: whole frame 14 ms, crop 14 ms; Phone: whole frame 14 ms, crop 14 ms.
+Time per call on this laptop (median): Webcam: whole frame 13 ms, crop 13 ms; Phone: whole frame 13 ms, crop 13 ms.
 <!-- END mediapipe -->
 
 ## 8. Tracking, clicks and swipes
@@ -268,10 +268,10 @@ The engine sends pointer positions about 30 times a second to the web front end,
 | plain colours and patterns | Phone | 2.6 % | 27 % | 85 % | 90 % | 9 px |
 | slides and text | Webcam | 7.5 % | 33 % | 100 % | 90 % | 5 px |
 | slides and text | Phone | 3.1 % | 33 % | 100 % | 96 % | 7 px |
-| drawings and games | Webcam | 0.7 % | 0 % | 100 % | 100 % | 6 px |
+| drawings and games | Webcam | 0.7 % | 0 % | 100 % | 100 % | 7 px |
 | drawings and games | Phone | 0.4 % | 0 % | 100 % | 100 % | 10 px |
-| photos and desktop | Webcam | 16.5 % | 86 % | 95 % | 75 % | 90 px |
-| photos and desktop | Phone | 6.6 % | 71 % | 86 % | 64 % | 104 px |
+| photos and desktop | Webcam | 16.5 % | 86 % | 95 % | 75 % | 184 px |
+| photos and desktop | Phone | 6.6 % | 71 % | 86 % | 64 % | 98 px |
 <!-- END per_class -->
 
 - **Photos and the desktop screenshot.** Fine detail (leaves, small icons) everywhere. In the failure figure below, the residual (panel 4) is high all over the textured areas, not only on the hand: at fine detail, small errors in position, blur and colour are larger than the 5×5 tolerance forgives. Clean frames then get false blobs. When a false blob joins the hand's blob, the "farthest point" lands in the wrong place, which is why the median tip error is large for this class.
