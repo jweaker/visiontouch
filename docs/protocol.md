@@ -32,6 +32,7 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 | `{"t":"cmd","name":"mode","value":"apps"}` | `apps`: pointers drive the stage. `desktop`: pointers drive the OS mouse; the engine shrinks the stage window to a small always-on-top strip and the stage shows only a "back to apps" button in it. |
 | `{"t":"cmd","name":"subscribe_mask","value":true}` | Start or stop mask messages. |
 | `{"t":"cmd","name":"keystone","value":true}` | Turn automatic keystone correction on or off (the engine answers with a `warp`). |
+| `{"t":"cmd","name":"sensitivity","value":1.0}` | Detection sensitivity, 0.4 to 2.5 (1 is the default). Higher finds fainter hands and risks more false alarms; useful with weak projectors. Reported back in `state.sensitivity`. |
 | `{"t":"cmd","name":"camera","value":"0"}` | Switch camera source. |
 | `{"t":"log","name":"accuracy","data":{...}}` | Append a record to the engine's run log (used by the accuracy test app). |
 

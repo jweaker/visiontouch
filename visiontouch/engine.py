@@ -40,9 +40,15 @@ class Engine:
         self.mode, self.mask_wanted, self.message = "apps", False, ""
         self.fps, self.latency, self.predictor = 0.0, 0.2, None
         self.mouse = None
+        self._recording = None  # (folder, list of frame records) while a session is being recorded
+        self.sensitivity = 1.0  # user knob: scales the detection thresholds
+        self._covered_since = self._last_frame = time.monotonic()
+        self._drift = 0  # consecutive checks in which the picture looked shifted
         self.keystone, self.warp = True, np.eye(3)  # warp: content box pixels -> screen pixels
-        self._frame_number, self._count = 0, 0
+        self._frame_number, self._frame_time, self._count = 0, 0.0, 0
         self._open_camera(camera)
+        if os.environ.get("VISIONTOUCH_RECORD"):  # set to a folder name to record the session
+            self.record(os.environ["VISIONTOUCH_RECORD"])
 
     # --- setup ---
 
@@ -72,7 +78,7 @@ class Engine:
     def _send_state(self):
         self.server.send({"t": "state", "calibrated": self.predictor is not None, "camera": self.source,
                           "fps": round(self.fps, 1), "latency_ms": round(self.latency * 1000), "mode": self.mode,
-                          "keystone": self.keystone, "message": self.message})
+                          "keystone": self.keystone, "sensitivity": self.sensitivity, "message": self.message})
 
     def _content(self):
         """Content box pixels -> screen pixels: the keystone correction while
@@ -167,23 +173,58 @@ class Engine:
             return 0.2
         return float(np.clip(seen_camera - seen_screen, 0.03, 0.6))
 
+    def record(self, folder):
+        """Save every camera frame and screen picture from now on, so the
+        session can be replayed offline (python -m eval.replay <folder>)."""
+        folder = Path(folder)
+        folder.mkdir(parents=True, exist_ok=True)
+        if self._saved.exists():
+            (folder / self._saved.name).write_bytes(self._saved.read_bytes())
+        self._recording = (folder, [])
+
+    def _record(self, frame, when, screen):
+        folder, frames = self._recording
+        if not frames or frames[-1]["screen_id"] != id(screen):  # the screen changed: store it once
+            cv2.imwrite(str(folder / f"screen_{len(frames):06d}.png"), screen)
+            name = f"screen_{len(frames):06d}.png"
+        else:
+            name = frames[-1]["screen"]
+        cv2.imwrite(str(folder / f"frame_{len(frames):06d}.jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        frames.append({"time": when, "screen": name, "screen_id": id(screen)})
+        if len(frames) % 30 == 0:
+            (folder / "index.json").write_text(json.dumps({"camera": self.source, "screen_size": self.screen.size, "frames": frames}))
+
     # --- per frame ---
 
     def step(self):
         frame, when, number = self.camera.read(newer_than=self._frame_number, timeout=1.0)
+        if frame is not None:
+            self._last_frame = time.monotonic()
         if frame is None or self.predictor is None:
             time.sleep(0.02)
             return None
-        self._frame_number = number
+        self._frame_number, self._frame_time = number, when
         screen, changed = self.screen.at(when - self.latency)
         if screen is None:
             return None
+        if self._recording:
+            self._record(frame, when, screen)
         p = self.predictor
         ignore = None
         if changed is not None:  # parts of the screen in motion cannot be compared
             ignore = cv2.dilate(p.warp_screen(changed.astype(np.uint8)), np.ones((5, 5), np.uint8)) > 0
         residual, predicted, observed = p.residual(screen, frame, ignore)
-        mask, labels, blobs = clean_mask(residual)
+        mask, labels, blobs = clean_mask(residual, self.sensitivity)
+        # If most of the picture disagrees with the prediction for seconds on
+        # end, it is not a hand: the camera or the projector has moved.
+        if mask.sum() < 0.6 * p.inside.sum():
+            self._covered_since = when
+        # A small knock shows up as a sideways shift between the predicted and
+        # the observed picture; phase correlation measures it (once a second).
+        if self._count % 30 == 0:
+            grey = [cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) for image in (predicted, observed)]
+            (dx, dy), confidence = cv2.phaseCorrelate(grey[0], grey[1], cv2.createHanningWindow(p.size, cv2.CV_32F))
+            self._drift = self._drift + 1 if confidence > 0.25 and np.hypot(dx, dy) > 2.5 else 0
 
         detections, drawn = [], []
         for hand in find_tips(labels, blobs, p.inside):
@@ -288,6 +329,8 @@ class Engine:
             elif name == "keystone":
                 self.keystone = bool(value)
                 self._send_warp()
+            elif name == "sensitivity":
+                self.sensitivity = float(np.clip(float(value), 0.4, 2.5))
             elif name == "camera":
                 try:
                     self._open_camera(value)
@@ -296,14 +339,29 @@ class Engine:
             self._send_state()
 
     def run(self):
-        last_state = started = time.monotonic()
+        last_state = time.monotonic()
         frames = 0
         while True:
             while not self.server.inbox.empty():
                 self._handle(self.server.inbox.get())
-            if self.step() is not None:
-                frames += 1
             now = time.monotonic()
+            frames += self.step() is not None
+            # Look after itself: calibrate on first use, recalibrate after a bump,
+            # reopen a camera that stopped sending pictures.
+            if self.mode == "apps" and self.server.window and now - self._last_frame < 1:
+                if self.predictor is None and not self.message.startswith("Calibration failed"):
+                    self.calibrate()
+                elif self.predictor is not None and (self._drift >= 3 or self._frame_time - self._covered_since > 4):
+                    self._say("The camera or projector has moved: recalibrating")
+                    self.calibrate()
+                    self._drift, self._covered_since = 0, self._frame_time
+            if now - self._last_frame > 4:
+                self._say("The camera stopped sending pictures: reconnecting")
+                try:
+                    self._open_camera(self.source)
+                except RuntimeError:
+                    time.sleep(2)
+                self._last_frame = time.monotonic()
             if now - last_state > 1:
                 self.fps, frames, last_state = frames / (now - last_state), 0, now
                 self._send_state()

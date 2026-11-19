@@ -5,7 +5,7 @@ import { C, type App } from '../ui'
 export const settings: App = {
   id: 'settings',
   title: 'Settings',
-  blurb: 'Calibrate, keystone, mode, camera.',
+  blurb: 'Calibrate, mode, camera.',
   color: C.white,
   icon: '<svg viewBox="0 0 64 64"><path d="M10 18h44M10 32h44M10 46h44"/><circle cx="22" cy="18" r="6"/><circle cx="42" cy="32" r="6"/><circle cx="28" cy="46" r="6"/></svg>',
 

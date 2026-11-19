@@ -24,6 +24,6 @@ test('works with a mouse when the engine is absent', async ({ page }) => {
     }
     await holdHome(page)
   }
-  // The only acceptable noise is the browser reporting that /ws is not there.
-  expect(errors.filter((e) => !/WebSocket|\/ws\b/.test(e))).toEqual([])
+  // The only acceptable noise is the browser reporting that /ws and /save (the engine's) are not there.
+  expect(errors.filter((e) => !/WebSocket|\/ws\b|\/save\//.test(e))).toEqual([])
 })

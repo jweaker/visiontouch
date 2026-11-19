@@ -17,17 +17,19 @@ MIN_AREA = 0.0015  # smallest blob, as a fraction of the working image
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"
 
 
-def clean_mask(residual):
+def clean_mask(residual, sensitivity=1.0):
     """Hysteresis threshold plus morphology. A blob is kept if it has strong
     pixels, is big enough, and looks solid after opening (which removes thin
     edge leftovers and speckle). Thin parts attached to a kept blob (a finger)
     are then restored, and the margin lost to the residual's edge tolerance is
-    given back."""
-    raw = (residual > LOW).astype(np.uint8)
+    given back. `sensitivity` above 1 lowers both thresholds (finds fainter
+    hands, risks more false alarms); below 1 raises them."""
+    low, high = LOW / sensitivity, HIGH / sensitivity
+    raw = (residual > low).astype(np.uint8)
     weak = cv2.morphologyEx(raw, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     weak = cv2.morphologyEx(weak, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
     count, labels, stats, _ = cv2.connectedComponentsWithStats(weak, connectivity=8)
-    strong = np.bincount(labels[residual > HIGH], minlength=count)
+    strong = np.bincount(labels[residual > high], minlength=count)
     keep = (stats[:, cv2.CC_STAT_AREA] >= MIN_AREA * residual.size) & (strong >= 0.2 * stats[:, cv2.CC_STAT_AREA])
     keep[0] = False
     kept = keep[labels].astype(np.uint8)

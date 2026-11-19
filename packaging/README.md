@@ -21,14 +21,14 @@ The Android USB camera option requires `adb` and `scrcpy` on `PATH` plus their s
 
 ## Build locally
 
-Build on the target OS and architecture. Use uv, Python 3.14.8, Node.js 24, and pnpm 12.8.1. From the repository root, run:
+Build on the target OS and architecture. Use a current uv, its managed Python 3.14.8, Node.js 24, and pnpm 12.8.1. From the repository root, run:
 
 ```sh
 cd web
 pnpm install --frozen-lockfile
 pnpm build
 cd ..
-uv sync --locked --no-dev --python 3.14.8
+uv sync --locked --no-dev --managed-python --python 3.14.8
 uv pip install -r packaging/requirements.txt
 ```
 

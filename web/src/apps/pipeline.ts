@@ -32,9 +32,16 @@ export const pipeline: App = {
         </div>
       </div>`
 
-    // Stop streams by clearing src: removing the <img> alone may leave the connection open,
-    // and browsers allow only six connections per host.
-    const stopStreams = () => root.querySelectorAll('img').forEach((img) => (img.src = ''))
+    // Each stream is an <img> inside its own small iframe. WebKit (the macOS built-in window)
+    // keeps an MJPEG connection open after its <img> is cleared or removed, until the document
+    // goes away, and browsers allow only six connections per host. Removing the iframe ends it.
+    const stream = (id: string) =>
+      `<iframe class="stream" title="${id}" srcdoc='<style>body{margin:0;background:#fff}img{display:block;width:100%;height:100vh;object-fit:contain}</style><img src="/debug/${id}.mjpg" alt="${id}">'></iframe>`
+    const stopStreams = () =>
+      root.querySelectorAll<HTMLIFrameElement>('iframe.stream').forEach((f) => {
+        f.contentDocument?.querySelectorAll('img').forEach((img) => (img.src = ''))
+        f.remove()
+      })
 
     // Only ask the engine for streams when it's connected; otherwise show friendly placeholders.
     let alive = true
@@ -53,7 +60,7 @@ export const pipeline: App = {
       root.querySelectorAll<HTMLElement>('figure').forEach((fig) => {
         const id = fig.dataset.stage!
         fig.querySelector('.frame')!.innerHTML = live.includes(id)
-          ? `<img src="/debug/${id}.mjpg" alt="${id}">`
+          ? stream(id)
           : `<span class="placeholder">${engine.connected ? 'This stage is not running' : 'Waiting for the engine…'}</span>`
       })
     }

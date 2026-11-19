@@ -121,7 +121,7 @@ test('the outside of the keystoned content box is black, the box itself is paper
     const ctx = c.getContext('2d')!
     ctx.drawImage(img, 0, 0)
     const at = (x: number, y: number) => [...ctx.getImageData(x, y, 1, 1).data.slice(0, 3)]
-    return [at(20, 20), at(960, 1010)] // window corner; inside the box below the tiles (footer line)
+    return [at(20, 20), at(272, 932)] // window corner; content (100, 1030): footer margin, plain paper
   }, png.toString('base64'))
   expect(outside).toEqual([0, 0, 0])
   expect(Math.min(...inside)).toBeGreaterThan(200)
@@ -185,8 +185,9 @@ test('pipeline streams only the listed stages and closes them on leaving', async
   await request.post(`${ENGINE}/fake/stages`, { data: JSON.stringify(['camera', 'residual', 'mask']) })
   try {
     await page.goto(`${ENGINE}/#pipeline`)
-    await expect(page.locator('.stages img')).toHaveCount(3)
-    await expect(page.locator('figure[data-stage=camera] img')).toBeVisible()
+    await expect(page.locator('.stages iframe.stream')).toHaveCount(3)
+    await expect(page.frameLocator('figure[data-stage=camera] iframe').locator('img')).toBeVisible()
+    await expect.poll(() => page.frameLocator('figure[data-stage=mask] iframe').locator('img').evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(320)
     await expect(page.locator('figure[data-stage=predicted] .placeholder')).toHaveText('This stage is not running')
     await expect.poll(streams).toBe(3)
     // Pipeline order, left to right and top to bottom.

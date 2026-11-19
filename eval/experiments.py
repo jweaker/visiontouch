@@ -333,12 +333,14 @@ def mediapipe_firing():
         screen_to_cam = np.linalg.inv(p.cam_to_screen)
         half = 0.13 * p.span
         counts = {key: [] for key in ("clean_full", "hand_full", "hand_engine_crop", "hand_true_crop")}
-        errors = []
+        errors, full_ms, crop_ms = [], [], []
         for f in frames(cam, p):
             if f["k"] != 1:
                 continue
+            start = time.perf_counter()
             rgb = np.ascontiguousarray(cv2.cvtColor(f["frame"], cv2.COLOR_BGR2RGB))
             full = landmarker._model.detect(mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb))
+            full_ms.append(1000 * (time.perf_counter() - start))
             if f["truth"] is None:
                 counts["clean_full"].append(bool(full.hand_landmarks))
                 continue
@@ -354,28 +356,45 @@ def mediapipe_firing():
                 counts["hand_engine_crop"].append(points is not None)
             else:
                 counts["hand_engine_crop"].append(False)
+            start = time.perf_counter()
             points = landmarker.detect(f["frame"], true_tip, half)
+            crop_ms.append(1000 * (time.perf_counter() - start))
             counts["hand_true_crop"].append(points is not None)
             if points is not None:
                 index_tip = cv2.perspectiveTransform(np.float32([[points[8]]]), p.cam_to_screen)[0, 0]
                 errors.append(float(np.linalg.norm(index_tip - f["tip"])))
         out[cam] = {key: {"fired": int(sum(v)), "frames": len(v), "rate": float(np.mean(v)) if v else None} for key, v in counts.items()}
         out[cam]["true_crop_index_tip_error_px"] = errors
+        out[cam]["ms_full_frame"], out[cam]["ms_crop"] = float(np.median(full_ms)), float(np.median(crop_ms))
     return out
 
 
 # --- reports from the rig and the real-hand log (read fresh every time) ---
 
+REPORT_LABELS = {"0": "Webcam", "android": "Phone"}
+CONDITIONS = {"washed": "washed-out picture"}  # report_<camera>_<condition>.json, see eval/live_test.py --washed
+
+
+def report_label(key):
+    """'0' -> 'Webcam', '0_washed' -> 'Webcam, washed-out picture'."""
+    camera, _, condition = key.partition("_")
+    name = REPORT_LABELS.get(camera, f"Camera {camera}")
+    return f"{name}, {CONDITIONS.get(condition, condition)}" if condition else name
+
+
 def rig_reports():
-    """Every live, idle and keystone report found under runs/."""
-    read = lambda path: json.loads(path.read_text())
+    """Every live, idle and keystone report found under runs/, keyed by the
+    file name after 'report_'. Idle reports are {app: counts}; the others get a
+    'label' and live ones the camera delay parsed from the calibration message."""
     out = {"live": {}, "idle": {}, "keystone": {}}
     for kind in out:
         for path in sorted(Path("runs", kind).glob("report_*.json")):
-            out[kind][path.stem.removeprefix("report_")] = read(path)
-    for report in out["live"].values():
-        found = re.search(r"(\d+) ms delay", report.get("calibration", ""))
-        report["camera_delay_ms"] = int(found.group(1)) if found else None
+            out[kind][path.stem.removeprefix("report_")] = json.loads(path.read_text())
+    for kind in ("live", "keystone"):
+        for key, report in out[kind].items():
+            report["label"] = report_label(key)
+            found = re.search(r"(\d+) ms delay", report.get("calibration", ""))
+            report["camera_delay_ms"] = int(found.group(1)) if found else None
     return out
 
 

@@ -7,7 +7,7 @@ export const W = 1920, H = 1080
 /** Collect console errors and uncaught exceptions. */
 export function watchErrors(page: Page) {
   const errors: string[] = []
-  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()))
+  page.on('console', (m) => m.type() === 'error' && errors.push(`${m.text()} (${m.location().url})`))
   page.on('pageerror', (e) => errors.push(String(e)))
   return errors
 }

@@ -1,6 +1,6 @@
 """End-to-end test on the real rig, with nobody in the room.
 
-    python -m eval.live_test [camera] [--pictures white balloons ...]
+    python -m eval.live_test [camera] [--washed] [--pictures white balloons ...]
 
 Calibrates for real, then projects test pictures with a synthetic hand painted
 in while the engine is told the picture has no hand. The engine therefore has
@@ -21,7 +21,7 @@ from visiontouch.engine import Engine
 from visiontouch.predict import SCREEN_SCALE
 
 ARGS = sys.argv[1:]
-PICTURES = ARGS[ARGS.index("--pictures") + 1:] if "--pictures" in ARGS else ["white", "pastel", "light", "board", "balloons", "slide_light", "text", "mid"]
+PICTURES = [a for a in ARGS[ARGS.index("--pictures") + 1:] if not a.startswith("--")] if "--pictures" in ARGS else ["white", "pastel", "light", "board", "balloons", "slide_light", "text", "mid"]
 CAMERA = ARGS[0] if ARGS and not ARGS[0].startswith("--") else "0"
 OUT = Path("runs/live")
 
@@ -45,6 +45,8 @@ class PretendScreen:
 def main(server):
     assert server.wait_for_stage(), "stage window did not connect"
     OUT.mkdir(parents=True, exist_ok=True)
+    if "--washed" in ARGS:  # imitate a weak projector in a lit room: grey blacks, dim whites
+        server.view.evaluate_js("document.documentElement.style.filter = 'contrast(0.45) brightness(0.85)'")
     engine = Engine(server, CAMERA)
     assert engine.calibrate(), engine.message
     print(engine.message, flush=True)
@@ -95,7 +97,8 @@ def main(server):
             (OUT / f"{name}_{stage}.jpg").write_bytes(server._debug[stage])
     server.show(None)
     summary = {"camera": CAMERA, "calibration": engine.message, "ms_per_frame": 1000 * float(np.median(times)), "pictures": report}
-    (OUT / f"report_{CAMERA.split(':')[0]}.json").write_text(json.dumps(summary, indent=1))
+    name = f"report_{CAMERA.split(':')[0]}{'_washed' if '--washed' in ARGS else ''}.json"
+    (OUT / name).write_text(json.dumps(summary, indent=1))
     print("median step time %.1f ms" % summary["ms_per_frame"])
     engine.camera.close()
 
