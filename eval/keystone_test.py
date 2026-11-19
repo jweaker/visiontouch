@@ -70,9 +70,11 @@ def main(server):
     pretend, rng, errors = PretendScreen(engine.screen), np.random.default_rng(5), []
     engine.screen = pretend
     plain = np.full((h, w, 3), 240, np.uint8)
-    pretend.show(cv2.warpPerspective(plain, engine.warp, (w, h)))
+    server.show(cv2.warpPerspective(plain, engine.warp, (w, h)))
+    time.sleep(1.0)
+    pretend.freeze(engine, cv2.warpPerspective(plain, engine.warp, (w, h)))
     for trial in range(4):
-        mask, tip = fake_hand(rng)
+        mask, tip = pretend.clear_of(lambda: fake_hand(rng))
         server.show(cv2.warpPerspective(occlude(plain, mask, "shadow"), engine.warp, (w, h)))
         time.sleep(0.9)
         engine.tracker.pointers.clear()

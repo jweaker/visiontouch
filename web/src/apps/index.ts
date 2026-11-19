@@ -52,7 +52,7 @@ export const launcher: App = {
             )
             .join('')}
         </nav>
-        <footer>Point at a tile, then pinch or touch the wall. To come back, hold the house button in the top-right corner for one second.</footer>
+        <footer>Point at a tile, then hold still or pinch to press it. To come back, hold the house button in the top-right corner for one second.</footer>
       </div>`
     root.querySelectorAll<HTMLElement>('[data-go]').forEach((b) => b.addEventListener('click', () => (location.hash = b.dataset.go!)))
 

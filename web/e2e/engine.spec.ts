@@ -192,7 +192,7 @@ test('pipeline streams only the listed stages and closes them on leaving', async
     await expect.poll(streams).toBe(3)
     // Pipeline order, left to right and top to bottom.
     expect(await page.locator('figure').evaluateAll((f) => f.map((e) => (e as HTMLElement).dataset.stage))).toEqual([
-      'camera', 'rectified', 'predicted', 'residual', 'mask', 'overlay',
+      'camera', 'predicted', 'residual', 'mask', 'overlay',
     ])
     await shot(page, info, '12-pipeline')
     await page.evaluate(() => (location.hash = ''))

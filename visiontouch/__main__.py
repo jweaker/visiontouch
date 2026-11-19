@@ -62,6 +62,7 @@ def main():
     parser.add_argument("--windowed", action="store_true", help="do not go fullscreen")
     parser.add_argument("--browser", action="store_true", help="open the stage in the default browser instead of the built-in window")
     parser.add_argument("--no-landmarks", action="store_true", help="classical detection only (no MediaPipe)")
+    parser.add_argument("--record", metavar="FOLDER", help="save camera frames and screen pictures for offline replay (python -m eval.replay)")
     parser.add_argument("--check", action="store_true", help="verify the stage and hand model without a window or camera")
     parser.add_argument("--check-log", metavar="FILE", help="write self-check output to a file")
     args = parser.parse_args()
@@ -85,7 +86,10 @@ def main():
     from visiontouch.engine import Engine
 
     def run_engine(server):
-        Engine(server, args.camera, landmarks=not args.no_landmarks).run()
+        engine = Engine(server, args.camera, landmarks=not args.no_landmarks)
+        if args.record:
+            engine.record(args.record)
+        engine.run()
 
     frozen_linux = sys.platform.startswith("linux") and getattr(sys, "frozen", False)
     if args.browser or frozen_linux:

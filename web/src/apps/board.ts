@@ -1,6 +1,7 @@
 // Board: freehand drawing. Pointer down draws; an open palm (pose "palm") wipes with a big eraser.
 import { contentPoint } from '../warp'
 import { poseOf } from '../pointers'
+import { send } from '../engine'
 import { drawAll, extend, type Stroke } from '../ink'
 import { C, fitCanvas, type App } from '../ui'
 
@@ -12,7 +13,7 @@ const PALM_ERASER = 160
 export const board: App = {
   id: 'board',
   title: 'Board',
-  blurb: 'Draw with your finger. Open your palm to erase.',
+  blurb: 'Hold still or pinch to draw. Open your palm to erase.',
   color: C.cobalt,
   icon: '<svg viewBox="0 0 64 64"><path d="M8 46c8-16 16-24 22-16s10 10 26-14"/><circle cx="12" cy="54" r="3"/></svg>',
 
@@ -123,6 +124,18 @@ export const board: App = {
     const end = (e: PointerEvent) => live.delete(e.pointerId)
     canvas.addEventListener('pointerup', end)
     canvas.addEventListener('pointercancel', end)
-    return () => clearTimeout(hideSaved)
+
+    // Drawing without a pinch: over the canvas, holding still presses the pen down and the next
+    // hold lifts it (the engine's "hold" dwell). Over the toolbar a hold is an ordinary tap.
+    let dwell = 'tap'
+    const setDwell = (mode: 'tap' | 'hold') => {
+      if (mode !== dwell) send({ t: 'cmd', name: 'dwell', value: (dwell = mode) })
+    }
+    canvas.addEventListener('pointermove', () => setDwell('hold'))
+    root.querySelector('.toolbar')!.addEventListener('pointermove', () => setDwell('tap'))
+    return () => {
+      clearTimeout(hideSaved)
+      setDwell('tap')
+    }
   },
 }

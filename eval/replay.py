@@ -1,7 +1,7 @@
 """Replays a recorded session through the engine, offline.
 
-    VISIONTOUCH_RECORD=runs/hand1 python -m visiontouch    (record: use the app, then quit)
-    python -m eval.replay runs/hand1 [--video]             (replay as often as needed)
+    python -m visiontouch --record runs/hand1      (record: use the app, then quit)
+    python -m eval.replay runs/hand1 [--video]     (replay as often as needed)
 
 Prints what the engine reports for every frame, and with --video writes
 overlay.mp4 (camera view with mask, landmarks and pointers drawn in).

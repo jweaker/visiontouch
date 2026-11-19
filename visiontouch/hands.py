@@ -15,6 +15,7 @@ import numpy as np
 LOW, HIGH = 8, 18  # residual thresholds (grey levels): weak evidence, strong evidence
 MIN_AREA = 0.0015  # smallest blob, as a fraction of the working image
 GAP = 25  # pieces closer than this (working pixels) count as one blob
+THICK = 7  # a blob must be at least this wide somewhere (working pixels)
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"
 
 
@@ -31,7 +32,9 @@ def clean_mask(residual, sensitivity=1.0):
     weak = cv2.morphologyEx(weak, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
     count, labels, stats, _ = cv2.connectedComponentsWithStats(weak, connectivity=8)
     strong = np.bincount(labels[residual > high], minlength=count)
-    keep = (stats[:, cv2.CC_STAT_AREA] >= MIN_AREA * residual.size) & (strong >= 0.2 * stats[:, cv2.CC_STAT_AREA])
+    # An arm is wide somewhere; leftovers along the outlines of drawn shapes are thin strips.
+    wide = np.bincount(labels[cv2.erode(weak, np.ones((THICK, THICK), np.uint8)) > 0], minlength=count) > 0
+    keep = (stats[:, cv2.CC_STAT_AREA] >= MIN_AREA * residual.size) & (strong >= 0.2 * stats[:, cv2.CC_STAT_AREA]) & wide
     keep[0] = False
     kept = keep[labels].astype(np.uint8)
     for _ in range(4):  # grow back along thin parts, up to 12 px
@@ -78,18 +81,20 @@ class Landmarker:
     def detect(self, frame, centre, half):
         """Look for a hand in the square of half-size `half` around `centre`
         (camera pixels). Returns 21 x 2 landmark positions in camera pixels, or None."""
-        h, w = frame.shape[:2]
-        x0, y0 = int(max(centre[0] - half, 0)), int(max(centre[1] - half, 0))
-        x1, y1 = int(min(centre[0] + half, w)), int(min(centre[1] + half, h))
-        if x1 - x0 < 32 or y1 - y0 < 32:
+        x0, y0, side = int(centre[0] - half), int(centre[1] - half), int(2 * half)
+        if side < 32:
             return None
-        crop = cv2.cvtColor(frame[y0:y1, x0:x1], cv2.COLOR_BGR2RGB)
-        crop = cv2.resize(crop, (320, 320), interpolation=cv2.INTER_LINEAR)
+        # Cut the square out through an affine map: parts beyond the frame
+        # edge are filled in, so the crop stays square and the hand unstretched.
+        scale = 320 / side
+        to_crop = np.float32([[scale, 0, -x0 * scale], [0, scale, -y0 * scale]])
+        crop = cv2.warpAffine(frame, to_crop, (320, 320), borderMode=cv2.BORDER_REPLICATE)
+        crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         result = self._model.detect(self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=np.ascontiguousarray(crop)))
         if not result.hand_landmarks:
             return None
         points = np.array([[p.x, p.y] for p in result.hand_landmarks[0]])
-        return points * [x1 - x0, y1 - y0] + [x0, y0]
+        return points * side + [x0, y0]
 
 
 def read_pose(points):

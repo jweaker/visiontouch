@@ -20,7 +20,7 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 | `{"t":"mask","w":64,"h":36,"b64":"..."}` | Silhouette of everything in front of the screen, row-major, one byte per cell (0 or 255), base64. The grid covers the content box, like pointer coordinates. Sent about 15/s after `subscribe_mask`. |
 | `{"t":"pattern","id":7,"url":"/pattern/7.png"}` | Show this image stretched to the full window, unwarped, on top of everything. `url: null` removes it. Used for calibration. |
 | `{"t":"warp","m":[9 numbers]}` | Row-major 3×3 homography mapping content-box pixels to window pixels (keystone correction). `m: null` means identity. |
-| `{"t":"state","calibrated":true,"camera":"MacBook","fps":29.8,"latency_ms":110,"mode":"apps","keystone":true,"message":""}` | Engine status, sent on change and once a second. |
+| `{"t":"state","calibrated":true,"camera":"MacBook","fps":29.8,"latency_ms":110,"mode":"apps","keystone":true,"sensitivity":1.0,"dwell":"tap","message":""}` | Engine status, sent on change and once a second. |
 
 ## Stage → engine
 
@@ -39,7 +39,7 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 
 ## Debug images
 
-`GET /debug/<stage>.mjpg` streams a pipeline stage as MJPEG, usable directly as an `<img src>`. Stages: `camera`, `rectified`, `predicted`, `residual`, `mask`, `overlay`. `GET /debug/stages` returns a JSON array of the names that are live.
+`GET /debug/<stage>.mjpg` streams a pipeline stage as MJPEG, usable directly as an `<img src>`. Stages: `camera`, `predicted`, `residual`, `mask`, `overlay`. `GET /debug/stages` returns a JSON array of the names that are live.
 
 ## Saving files
 

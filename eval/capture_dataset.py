@@ -15,13 +15,11 @@ import numpy as np
 
 from eval.content import H, W, contents, fake_hand, occlude
 from visiontouch.app import run
-from visiontouch.calibrate import marker_pattern, stripes
+from visiontouch.calibrate import colour_tiles, marker_pattern
 from visiontouch.camera import Camera
 
 OUT = Path(sys.argv[1])
 SOURCES = sys.argv[2:] or ["0"]
-GREYS = [(v, v, v) for v in np.linspace(0, 255, 8).astype(int).tolist()]
-COLOURS = [(0, 0, 0), (0, 0, 255), (0, 255, 0), (255, 0, 0), (255, 255, 0), (255, 0, 255), (0, 255, 255), (255, 255, 255)]
 
 
 def main(server):
@@ -42,12 +40,10 @@ def main(server):
                 cv2.imwrite(str(folder / f"{cam_name}_{k}.jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 96])
         index[name] = extra or {}
 
-    # Calibration patterns. All but the first keep the average brightness constant.
+    # Calibration patterns: the marker grid, then colour mosaics.
     shoot("cal_markers", marker_pattern(W, H)[0], 1.5)
-    for shift in range(8):
-        shoot(f"cal_grey_{shift}", stripes(W, H, GREYS, shift), 1.2 if shift == 0 else 0.6)
-    for shift in range(8):
-        shoot(f"cal_colour_{shift}", stripes(W, H, COLOURS, shift), 1.2 if shift == 0 else 0.6)
+    for seed in range(6):
+        shoot(f"cal_tiles_{seed}", colour_tiles(W, H, seed), 1.2 if seed == 0 else 0.7)
 
     # Test pictures: clean, then with a fake shadow, then with a fake lit hand.
     rng = np.random.default_rng(7)

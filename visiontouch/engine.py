@@ -42,14 +42,13 @@ class Engine:
         self.fps, self.latency, self.predictor = 0.0, 0.2, None
         self.mouse = None
         self._recording = None  # (folder, list of frame records) while a session is being recorded
+        self.blind = None  # working-image mask of places to disregard (set by rig tests)
         self.sensitivity = 1.0  # user knob: scales the detection thresholds
         self._covered_since = self._last_frame = time.monotonic()
         self._drift = 0  # consecutive checks in which the picture looked shifted
         self.keystone, self.warp = True, np.eye(3)  # warp: content box pixels -> screen pixels
         self._frame_number, self._frame_time, self._count = 0, 0.0, 0
         self._open_camera(camera)
-        if os.environ.get("VISIONTOUCH_RECORD"):  # set to a folder name to record the session
-            self.record(os.environ["VISIONTOUCH_RECORD"])
 
     # --- setup ---
 
@@ -79,7 +78,8 @@ class Engine:
     def _send_state(self):
         self.server.send({"t": "state", "calibrated": self.predictor is not None, "camera": self.source,
                           "fps": round(self.fps, 1), "latency_ms": round(self.latency * 1000), "mode": self.mode,
-                          "keystone": self.keystone, "sensitivity": self.sensitivity, "message": self.message})
+                          "keystone": self.keystone, "sensitivity": self.sensitivity,
+                          "dwell": "hold" if self.tracker.hold else "tap", "message": self.message})
 
     def _content(self):
         """Content box pixels -> screen pixels: the keystone correction while
@@ -214,6 +214,8 @@ class Engine:
         ignore = None
         if changed is not None:  # parts of the screen in motion cannot be compared
             ignore = cv2.dilate(p.warp_screen(changed.astype(np.uint8)), np.ones((5, 5), np.uint8)) > 0
+        if self.blind is not None:
+            ignore = self.blind if ignore is None else ignore | self.blind
         residual, predicted, observed = p.residual(screen, frame, ignore)
         mask, labels, blobs = clean_mask(residual, self.sensitivity)
         # If most of the picture disagrees with the prediction for seconds on
@@ -261,9 +263,6 @@ class Engine:
     def _publish_debug(self, p, observed, predicted, residual, mask, pointers, landmarks):
         view = observed.clip(0, 255).astype(np.uint8)
         self.server.debug("camera", view)
-        to_screen = np.diag([0.25, 0.25, 1.0]) @ np.linalg.inv(p.screen_to_work)
-        size = (self.screen.size[0] // 4, self.screen.size[1] // 4)
-        self.server.debug("rectified", cv2.warpPerspective(view, to_screen, size))
         self.server.debug("predicted", predicted.clip(0, 255).astype(np.uint8))
         self.server.debug("residual", cv2.applyColorMap(np.clip(residual * 8, 0, 255).astype(np.uint8), cv2.COLORMAP_JET))
         self.server.debug("mask", mask.astype(np.uint8) * 255)

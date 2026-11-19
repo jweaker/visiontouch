@@ -11,7 +11,9 @@ from pathlib import Path
 import cv2
 from aiohttp import WSMsgType, web
 
-STAGES = ["camera", "rectified", "predicted", "residual", "mask", "overlay"]  # debug images, in pipeline order
+# Debug images, in pipeline order. Five, because a browser opens at most six
+# connections to one host and one must stay free for patterns and saving.
+STAGES = ["camera", "predicted", "residual", "mask", "overlay"]
 WEB_DIR = Path(__file__).parent.parent / "web" / "dist"
 
 # Shown only when the real stage has not been built: enough to calibrate.

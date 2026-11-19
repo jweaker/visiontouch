@@ -5,7 +5,6 @@ import { C, type App } from '../ui'
 
 const STAGES: [id: string, title: string, caption: string][] = [
   ['camera', 'Camera frame', 'What the camera sees: wall, picture and your hand.'],
-  ['rectified', 'Rectified to screen', 'Warped with the calibration homography to line up with the screen.'],
   ['predicted', 'Predicted image', 'What the camera should see if nothing were in front of the screen.'],
   ['residual', 'Difference', 'Camera minus prediction: anything new, like a hand, lights up.'],
   ['mask', 'Mask', 'The difference after thresholding and clean-up: white = in front.'],
