@@ -3,7 +3,7 @@
 import { on, send } from '../engine'
 import { hands } from '../pointers'
 import { contentPoint, toWindow } from '../warp'
-import { C, burst, clock, dialog, fitCanvas, html, loop, type App } from '../ui'
+import { C, burst, clock, dialog, fitCanvas, html, loop, type App, darker } from '../ui'
 
 const LEVELS = [
   { name: 'Easy', speed: 220, every: 0.85, bad: 0.2 },
@@ -146,13 +146,13 @@ function drawStar(ctx: CanvasRenderingContext2D, it: Item, t: number) {
   ctx.fillStyle = it.color
   ctx.fill()
   ctx.lineWidth = 6
-  ctx.strokeStyle = C.ink
+  ctx.strokeStyle = darker(it.color)
   ctx.stroke()
 }
 
 function drawBomb(ctx: CanvasRenderingContext2D, it: Item, t: number) {
   ctx.lineWidth = 6
-  ctx.strokeStyle = C.ink
+  ctx.strokeStyle = darker(it.color)
   ctx.fillStyle = it.color
   ctx.beginPath() // spiky ball
   for (let i = 0; i < 24; i++) {

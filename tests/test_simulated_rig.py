@@ -192,7 +192,32 @@ def test_the_apps_own_feedback_does_not_disturb_the_pointer():
     assert np.percentile(errors, 90) < 0.03 * W, f"pointer off by {np.percentile(errors, 90):.1f} px (90th percentile)"
 
 
+def test_sprites_drifting_behind_a_still_hand_do_not_move_the_pointer():
+    """A game: bright balloons rise through the picture, right behind the hand."""
+    rig = SimulatedRig()
+    engine = Engine(rig, camera=rig, screen=rig, landmarks=False)
+    assert engine.calibrate(), engine.message
+    tip = np.array([0.5 * W, 0.45 * H])
+    rig.in_front = cv2.warpPerspective(_arm(tip), engine.warp, (W, H))
+    colours = [(60, 90, 255), (60, 200, 250), (120, 200, 80), (255, 120, 60), (220, 90, 220)] * 2
+    errors, lost, start = [], 0, time.monotonic()
+    while (t := time.monotonic() - start) < 5:
+        picture = np.full((H, W, 3), (235, 245, 255), np.uint8)
+        for i, colour in enumerate(colours):
+            centre = (int(W * (0.12 + 0.085 * i)), int(H + 150 - (t * 160 + i * 130) % (H + 300)))
+            cv2.ellipse(picture, centre, (55, 70), 0, 0, 360, colour, -1, cv2.LINE_AA)
+            cv2.ellipse(picture, centre, (55, 70), 0, 0, 360, tuple(int(v * 0.7) for v in colour), 5, cv2.LINE_AA)
+        pointers = engine.step()
+        if pointers and t > 1:
+            errors.append(np.hypot(pointers[0]["x"] * W - tip[0], pointers[0]["y"] * H - tip[1]))
+        lost += t > 1 and not pointers
+        rig.content = cv2.warpPerspective(picture, engine.warp, (W, H))
+    assert lost <= 2, f"the hand was lost in {lost} frames"
+    assert np.percentile(errors, 90) < 0.03 * W, f"pointer off by {np.percentile(errors, 90):.1f} px (90th percentile)"
+
+
 if __name__ == "__main__":
     test_calibrate_then_find_a_fingertip()
     test_the_apps_own_feedback_does_not_disturb_the_pointer()
+    test_sprites_drifting_behind_a_still_hand_do_not_move_the_pointer()
     print("ok")

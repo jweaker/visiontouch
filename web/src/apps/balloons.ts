@@ -1,6 +1,6 @@
 // Balloons: pop rising balloons by touching them. Any number of hands at once.
 import { contentPoint, toWindow } from '../warp'
-import { C, burst, clock, dialog, fitCanvas, html, loop, type App } from '../ui'
+import { C, burst, clock, dialog, fitCanvas, html, loop, type App, darker } from '../ui'
 
 const LEVELS = [
   { name: 'Easy', speed: 110, every: 0.9, r: 95 },
@@ -96,7 +96,7 @@ export const balloons: App = {
 
 function drawBalloon(ctx: CanvasRenderingContext2D, b: Balloon, x: number) {
   ctx.lineWidth = 6
-  ctx.strokeStyle = C.ink
+  ctx.strokeStyle = darker(b.color)
   ctx.beginPath() // string
   ctx.moveTo(x, b.y + b.r * 1.15)
   ctx.quadraticCurveTo(x - 14, b.y + b.r * 1.5, x, b.y + b.r * 1.9)

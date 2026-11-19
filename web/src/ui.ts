@@ -23,6 +23,11 @@ export const C = {
   white: '#FFFFFF',
 }
 
+/** A darker shade of a #RRGGBB colour, for outlining moving sprites. Not ink: wherever something
+ *  dark moves, the camera cannot see a hand in front of it, so sprites stay bright all over. */
+export const darker = (hex: string, keep = 0.7) =>
+  '#' + [1, 3, 5].map((i) => Math.round(parseInt(hex.slice(i, i + 2), 16) * keep).toString(16).padStart(2, '0')).join('')
+
 /** Build an element from an HTML string. */
 export function html<T extends HTMLElement = HTMLElement>(markup: string): T {
   const t = document.createElement('template')
