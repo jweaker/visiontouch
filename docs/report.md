@@ -14,10 +14,10 @@ VisionTouch turns an ordinary projector and an ordinary camera (a laptop webcam 
 <!-- BEGIN headline -->
 - **Webcam, recorded dataset (synthetic hands):** 6.1 % of clean pixels wrongly flagged (plain subtraction: 91.2 %); hand found in 88 % of frames; median fingertip error 11.9 px (0.62 % of the screen width).
 - **Phone, recorded dataset (synthetic hands):** 3.7 % of clean pixels wrongly flagged (plain subtraction: 97.5 %); hand found in 89 % of frames; median fingertip error 10.1 px (0.52 % of the screen width).
-- **Live rig, Webcam:** no false hand on the clean pictures; median pointer error within 20 px in 15 of 16 picture-and-hand cases; worst 973 px on `text`.
+- **Live rig, Webcam:** no false hand on the clean pictures; median pointer error within 20 px in 12 of 16 picture-and-hand cases; worst 73 px on `slide_light`.
 - **Live rig, Webcam, washed-out picture:** no false hand on the clean pictures; median pointer error within 20 px in 10 of 13 picture-and-hand cases; worst 280 px on `text`.
-- **Live rig, Phone:** no false hand on the clean pictures; median pointer error within 20 px in 13 of 16 picture-and-hand cases; worst 1000 px on `text`.
-- **Keystone (webcam):** edge tilt 5.1° before, 0.08° after; aspect 1.67 → 1.78 (target 1.78).
+- **Live rig, Phone:** no false hand on the clean pictures; median pointer error within 20 px in 14 of 16 picture-and-hand cases; worst 79 px on `text`.
+- **Keystone (webcam):** edge tilt 5.3° before, 0.11° after; aspect 1.67 → 1.78 (target 1.78).
 - **Real hands:** not yet measured.
 <!-- END headline -->
 
@@ -145,10 +145,10 @@ Hysteresis thresholds `LOW = 8` and `HIGH = 18` grey levels; opening 3×3, closi
 <!-- BEGIN keystone -->
 |  | Edge tilt | Aspect ratio (target 1.78) | Markers found |
 |---|---|---|---|
-| Before | 5.11° | 1.668 | 58 |
-| After | 0.08° | 1.777 | 59 |
+| Before | 5.30° | 1.666 | 53 |
+| After | 0.11° | 1.778 | 53 |
 
-Pointer error inside the corrected picture (synthetic shadow): median 5.1 px over 93 frames.
+Pointer error inside the corrected picture (synthetic shadow): median 3.1 px over 83 frames.
 <!-- END keystone -->
 
 ---
@@ -291,14 +291,14 @@ The engine calibrates itself, then the test projects each picture. First the cle
 <!-- BEGIN live -->
 | Camera | Picture | Clean: frames with a false hand | Shadow: frames with a pointer, median error | Lit hand: same |
 |---|---|---|---|---|
-| Webcam | white | 0 % | 92 %, 5 px | 92 %, 13 px |
-| Webcam | pastel | 0 % | 91 %, 9 px | 92 %, 6 px |
-| Webcam | light | 0 % | 91 %, 4 px | 92 %, 4 px |
-| Webcam | board | 0 % | 92 %, 8 px | 92 %, 10 px |
-| Webcam | balloons | 0 % | 91 %, 2 px | 91 %, 2 px |
-| Webcam | slide_light | 0 % | 89 %, 3 px | 90 %, 8 px |
-| Webcam | text | 0 % | 60 %, 5 px | 30 %, 973 px |
-| Webcam | mid | 0 % | 84 %, 4 px | 87 %, 5 px |
+| Webcam | white | 0 % | 91 %, 3 px | 92 %, 2 px |
+| Webcam | pastel | 0 % | 91 %, 2 px | 93 %, 3 px |
+| Webcam | light | 0 % | 91 %, 8 px | 92 %, 1 px |
+| Webcam | board | 0 % | 92 %, 6 px | 92 %, 2 px |
+| Webcam | balloons | 0 % | 92 %, 28 px | 92 %, 3 px |
+| Webcam | slide_light | 0 % | 92 %, 73 px | 92 %, 5 px |
+| Webcam | text | 0 % | 31 %, 70 px | 31 %, 21 px |
+| Webcam | mid | 0 % | 91 %, 13 px | 91 %, 4 px |
 | Webcam, washed-out picture | white | 0 % | 90 %, 154 px | 0 %, – |
 | Webcam, washed-out picture | pastel | 0 % | 90 %, 2 px | 30 %, 15 px |
 | Webcam, washed-out picture | light | 0 % | 91 %, 1 px | 89 %, 2 px |
@@ -307,14 +307,14 @@ The engine calibrates itself, then the test projects each picture. First the cle
 | Webcam, washed-out picture | slide_light | 0 % | 91 %, 11 px | 0 %, – |
 | Webcam, washed-out picture | text | 0 % | 62 %, 280 px | 0 %, – |
 | Webcam, washed-out picture | mid | 0 % | 90 %, 23 px | 92 %, 3 px |
-| Phone | white | 0 % | 84 %, 6 px | 80 %, 9 px |
-| Phone | pastel | 0 % | 80 %, 3 px | 90 %, 2 px |
-| Phone | light | 0 % | 90 %, 8 px | 90 %, 6 px |
-| Phone | board | 0 % | 90 %, 11 px | 89 %, 9 px |
-| Phone | balloons | 0 % | 91 %, 6 px | 91 %, 5 px |
-| Phone | slide_light | 0 % | 90 %, 4 px | 84 %, 10 px |
-| Phone | text | 0 % | 61 %, 211 px | 30 %, 1000 px |
-| Phone | mid | 0 % | 91 %, 359 px | 91 %, 5 px |
+| Phone | white | 0 % | 90 %, 6 px | 91 %, 3 px |
+| Phone | pastel | 0 % | 90 %, 5 px | 91 %, 7 px |
+| Phone | light | 0 % | 91 %, 6 px | 91 %, 2 px |
+| Phone | board | 0 % | 91 %, 5 px | 90 %, 5 px |
+| Phone | balloons | 0 % | 92 %, 10 px | 91 %, 7 px |
+| Phone | slide_light | 0 % | 91 %, 9 px | 91 %, 8 px |
+| Phone | text | 0 % | 31 %, 79 px | 30 %, 21 px |
+| Phone | mid | 0 % | 91 %, 10 px | 90 %, 10 px |
 <!-- END live -->
 
 A second false-alarm test opened every app with nobody in front of the screen:
@@ -324,16 +324,16 @@ A second false-alarm test opened every app with nobody in front of the screen:
 <!-- BEGIN idle -->
 | App | Webcam: false-hand frames | Phone: false-hand frames |
 |---|---|---|
-| launcher | 0 / 121 | 0 / 116 |
-| board | 0 / 121 | 0 / 114 |
-| balloons | 0 / 121 | 0 / 118 |
-| catch | 0 / 121 | 0 / 113 |
-| slides | 0 / 121 | 7 / 115 |
-| quiz | 0 / 121 | 44 / 55 |
-| memory | 0 / 121 | 0 / 121 |
-| accuracy | 0 / 121 | 0 / 119 |
-| pipeline | 0 / 99 | 0 / 88 |
-| settings | 0 / 121 | 0 / 119 |
+| launcher | 0 / 121 | 0 / 117 |
+| board | 0 / 121 | 0 / 118 |
+| balloons | 0 / 121 | 0 / 120 |
+| catch | 0 / 121 | 0 / 120 |
+| slides | 0 / 121 | 0 / 119 |
+| quiz | 0 / 120 | 0 / 115 |
+| memory | 0 / 121 | 0 / 119 |
+| accuracy | 0 / 121 | 0 / 118 |
+| pipeline | 0 / 100 | 0 / 88 |
+| settings | 0 / 121 | 0 / 117 |
 <!-- END idle -->
 
 The live tests count pointers after the tracker, which reports a hand only after three detections in a row; the offline numbers in 4.1 to 4.3 count single frames.
@@ -345,9 +345,9 @@ The live tests count pointers after the tracker, which reports a hand only after
 <!-- BEGIN latency -->
 | Camera | Camera + projector delay (calibration) | Engine step, live (median) | Residual only, offline (median) |
 |---|---|---|---|
-| Webcam | 160 ms | 39 ms | 31 ms |
+| Webcam | 184 ms | 37 ms | 31 ms |
 | Webcam, washed-out picture | 219 ms | 38 ms | – |
-| Phone | 229 ms | 46 ms | 27 ms |
+| Phone | 165 ms | 41 ms | 27 ms |
 <!-- END latency -->
 
 The largest share of the delay is the camera and projector, measured at calibration by flashing the screen and timing when the change appears in the screenshots and in the camera. The tracker predicts 60 ms ahead to hide part of it.

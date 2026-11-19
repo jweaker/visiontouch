@@ -150,7 +150,9 @@ How to read it: the colour map alone does not help, because the camera's exposur
 1. **Hysteresis threshold.** Pixels with residual above `LOW = 8` are weak evidence. A blob is only kept if at least 20 % of its pixels are above `HIGH = 18` (strong evidence).
 2. **Morphology.** An opening (3×3) removes single noisy pixels and thin lines left at edges. A closing (7×7) fills small holes inside the hand.
 3. **Connected components.** Every separate blob gets a label. Blobs smaller than 0.15 % of the image are dropped.
-4. Thin parts attached to a kept blob (a finger the opening removed) are grown back, up to 12 pixels.
+4. **Thickness test.** A blob must be at least 7 pixels wide somewhere (`THICK`), tested with an erosion. An arm is wide; the leftovers along the coloured outlines of buttons are thin strips, and this removes them.
+5. Thin parts attached to a kept blob (a finger the opening removed) are grown back, up to 12 pixels.
+6. **Grouping.** Pieces closer than 25 pixels (`GAP`) count as one blob. Where the picture is dark, a hand or shadow leaves no trace, so an arm crossing a dark drawing would otherwise be cut in two and its fingertip half thrown away.
 
 **Why.** A single threshold forces a bad choice: low enough to catch a faint hand also catches noise; high enough to ignore noise also cuts off the faint fingertip. Hysteresis uses the high threshold to decide *whether* a blob is real and the low one to decide *how big* it is.
 
@@ -221,7 +223,7 @@ Time per call on this laptop (median): Webcam: whole frame 14 ms, crop 14 ms; Ph
 
 - **Click by dwell**: hold the pointing finger still (within 2.5 % of the screen width) for 0.8 s.
 - **Click by pinch**: the pinch pose holds the button down.
-- **Hold mode** (protocol command `dwell` set to `hold`): the first hold presses and stays pressed while the finger moves, the next hold releases. This lets you draw without pinching; apps that draw switch it on when they open.
+- **Hold mode** (protocol command `dwell` set to `hold`): the first hold presses and stays pressed while the finger moves, the next hold releases. This lets you draw without pinching. The Board switches it on while the hand is over the drawing area and back to ordinary taps over its toolbar.
 - **Swipe**: move 30 % of the screen width sideways within 0.5 s (used by the Slides app).
 
 **Lecture.** Beyond the lectures (the Kalman filter is a state estimator from control theory).
@@ -243,10 +245,10 @@ Time per call on this laptop (median): Webcam: whole frame 14 ms, crop 14 ms; Ph
 <!-- BEGIN keystone -->
 |  | Edge tilt | Aspect ratio (target 1.78) | Markers found |
 |---|---|---|---|
-| Before | 5.11° | 1.668 | 58 |
-| After | 0.08° | 1.777 | 59 |
+| Before | 5.30° | 1.666 | 53 |
+| After | 0.11° | 1.778 | 53 |
 
-Pointer error inside the corrected picture (synthetic shadow): median 5.1 px over 93 frames.
+Pointer error inside the corrected picture (synthetic shadow): median 3.1 px over 83 frames.
 <!-- END keystone -->
 
 ## 10. Output
