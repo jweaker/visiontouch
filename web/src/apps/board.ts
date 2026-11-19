@@ -35,7 +35,9 @@ export const board: App = {
     const { ctx, w, h } = fitCanvas(canvas)
     const strokes: Stroke[] = []
     const live = new Map<number, Stroke>() // pointerId → stroke in progress (several hands at once)
-    let color = COLORS[0], size = SIZES[1], erasing = false
+    // Blue by default, not black: the camera cannot see a finger over a dark stroke, so with black
+    // ink the pen trails a few centimetres behind the fingertip.
+    let color = COLORS[1], size = SIZES[1], erasing = false
 
     const redraw = () => {
       ctx.fillStyle = C.white
