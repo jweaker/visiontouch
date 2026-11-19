@@ -25,6 +25,7 @@ This opens the projected stage full-screen and starts the camera. Useful options
 | `--windowed` | Do not go full-screen. |
 | `--browser` | Show the stage in your web browser instead of the built-in window. |
 | `--no-landmarks` | Classical detection only, without MediaPipe (no pinch or palm). |
+| `--record FOLDER` | Save the session (camera frames and screen pictures) so it can be replayed offline with `python -m eval.replay FOLDER`. |
 | `--check` | Check the installation without opening a window or camera. |
 
 Ready-made desktop builds are described in [packaging/README.md](packaging/README.md).
@@ -32,7 +33,7 @@ Ready-made desktop builds are described in [packaging/README.md](packaging/READM
 ## Aim the camera and calibrate
 
 1. Place the camera so it sees the **whole projected picture**, with a little margin around it. Below or beside the projector works. A steep angle works but lowers accuracy.
-2. Keep the camera **still**. If it moves, calibrate again.
+2. Keep the camera **still**. If it moves, the engine notices and calibrates again by itself.
 3. Open **Settings** and press **Calibrate now**. The projector shows a grid of black-and-white markers, a few colour mosaics, and a black and a white flash. Stay out of the picture for about ten seconds. The engine also calibrates on first start and recalibrates by itself if the camera or projector is knocked.
 4. The status line reports the number of markers found, the alignment error and the camera delay. If calibration fails, the camera probably cannot see the whole picture.
 
@@ -79,7 +80,7 @@ Put the phone on a stand: it must not move after calibration.
 - **Busy or dark content is hard.** Photos and cluttered desktops cause false detections; a hand over pure black is invisible to the camera method; dense text breaks the hand's outline. Plain backgrounds, slides, drawings and games work best.
 - **No true touch.** One camera cannot measure depth, so a click is a pause or a pinch, not contact with the wall.
 - **Delay.** The camera and projector add a noticeable delay; the pointer predicts a little ahead to hide part of it.
-- **One camera position.** Moving the camera or the projector needs a new calibration.
+- **One camera position.** The camera and projector must stay put. After a knock the engine notices within a few seconds and calibrates again by itself, which interrupts the picture for about ten seconds.
 
 The measured numbers are in [docs/report.md](docs/report.md).
 
