@@ -14,36 +14,45 @@ import numpy as np
 
 LOW, HIGH = 8, 18  # residual thresholds (grey levels): weak evidence, strong evidence
 MIN_AREA = 0.0015  # smallest blob, as a fraction of the working image
-GAP = 25  # pieces closer than this (working pixels) count as one blob
+GAP = 9  # pieces closer than this (working pixels) count as one blob
 THICK = 7  # a blob must be at least this wide somewhere (working pixels)
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"
 
 
 def clean_mask(residual, sensitivity=1.0):
-    """Hysteresis threshold plus morphology. A blob is kept if it has strong
-    pixels, is big enough, and looks solid after opening (which removes thin
-    edge leftovers and speckle). Thin parts attached to a kept blob (a finger)
-    are then restored, and the margin lost to the residual's edge tolerance is
-    given back. `sensitivity` above 1 lowers both thresholds (finds fainter
-    hands, risks more false alarms); below 1 raises them."""
+    """From the residual to blobs. Returns (mask, labels, blob numbers).
+
+    1. Hysteresis threshold plus morphology: a piece counts as a real object
+       if it has strong pixels, is big enough, and is wide somewhere (an arm
+       is; leftovers along the outlines of drawn shapes are thin strips).
+    2. Pieces near each other are one blob, and a blob is kept if it contains
+       a real object. So a fingertip cut off from its hand (the picture is
+       dark there, or a drawn line crosses the finger) is still part of the
+       arm, while a lone small piece is dropped.
+    3. Thin parts next to the blob are restored and the margin lost to the
+       residual's edge tolerance is given back.
+
+    `sensitivity` above 1 lowers both thresholds (finds fainter hands, risks
+    more false alarms); below 1 raises them."""
     low, high = LOW / sensitivity, HIGH / sensitivity
     raw = (residual > low).astype(np.uint8)
     weak = cv2.morphologyEx(raw, cv2.MORPH_OPEN, np.ones((3, 3), np.uint8))
     weak = cv2.morphologyEx(weak, cv2.MORPH_CLOSE, np.ones((7, 7), np.uint8))
-    count, labels, stats, _ = cv2.connectedComponentsWithStats(weak, connectivity=8)
-    strong = np.bincount(labels[residual > high], minlength=count)
-    # An arm is wide somewhere; leftovers along the outlines of drawn shapes are thin strips.
-    wide = np.bincount(labels[cv2.erode(weak, np.ones((THICK, THICK), np.uint8)) > 0], minlength=count) > 0
-    keep = (stats[:, cv2.CC_STAT_AREA] >= MIN_AREA * residual.size) & (strong >= 0.2 * stats[:, cv2.CC_STAT_AREA]) & wide
-    keep[0] = False
-    kept = keep[labels].astype(np.uint8)
+    count, pieces, stats, _ = cv2.connectedComponentsWithStats(weak, connectivity=8)
+    strong = np.bincount(pieces[residual > high], minlength=count)
+    wide = np.bincount(pieces[cv2.erode(weak, np.ones((THICK, THICK), np.uint8)) > 0], minlength=count) > 0
+    real = (stats[:, cv2.CC_STAT_AREA] >= MIN_AREA * residual.size) & (strong >= 0.2 * stats[:, cv2.CC_STAT_AREA]) & wide
+    real[0] = False
+    count, groups = cv2.connectedComponents(cv2.dilate(weak, np.ones((GAP, GAP), np.uint8)), connectivity=8)
+    kept_groups = np.zeros(count, bool)
+    kept_groups[groups[real[pieces]]] = True
+    kept = (weak > 0) & kept_groups[groups]
+    kept = kept.astype(np.uint8)
     for _ in range(4):  # grow back along thin parts, up to 12 px
         kept = cv2.dilate(kept, np.ones((7, 7), np.uint8)) & (raw | kept)
     kept = cv2.dilate(kept, np.ones((5, 5), np.uint8))
-    # Pieces close to each other belong to one arm: where the picture is dark a
-    # hand or shadow leaves no trace, which would otherwise cut the arm in two.
-    count, groups = cv2.connectedComponents(cv2.dilate(kept, np.ones((GAP, GAP), np.uint8)), connectivity=8)
-    return kept > 0, np.where(kept > 0, groups, 0), np.arange(1, count)
+    groups = np.where(kept > 0, groups, 0)
+    return kept > 0, groups, np.unique(groups[groups > 0])
 
 
 def find_tips(labels, blobs, inside):
@@ -122,7 +131,7 @@ if __name__ == "__main__":  # self-check on a synthetic arm
     mask, labels, blobs = clean_mask(residual)
     hands = find_tips(labels, blobs, inside)
     assert len(hands) == 1 and np.linalg.norm(hands[0]["tip"] - [300, 112]) < 12, hands
-    residual[190:205] = 0  # the arm crosses a dark stripe and disappears there: still one arm
+    residual[198:203] = 0  # the arm crosses a dark line and disappears there: still one arm
     assert np.linalg.norm(find_tips(*clean_mask(residual)[1:], inside)[0]["tip"] - [300, 112]) < 12
     assert not mask[10, 100]
     square = np.zeros((21, 2)); square[9] = [0, -100]; square[[6, 10, 14, 18]] = [0, -150]; square[[8, 12, 16, 20]] = [0, -230]; square[4] = [80, -60]

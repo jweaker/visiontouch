@@ -72,7 +72,7 @@ class Predictor:
         self._screen_size = screen_size
         self.set_area(np.eye(3))
         self.colour_map = None  # 20 polynomial terms x 3 camera channels, from calibration
-        self._cached_screen = None
+        self._cache = {}
 
     def set_area(self, content_to_screen):
         """Restrict detection to the content box (the whole screen for an
@@ -104,23 +104,27 @@ class Predictor:
             xs.append(_features(warped[::2, ::2].reshape(-1, 3)[keep]))
             ys.append(observed[::2, ::2].reshape(-1, 3)[keep])
         self.colour_map = _robust_fit(np.concatenate(xs), np.concatenate(ys), pull=CALIBRATION_PULL)
-        self._cached_screen = None
+        self._cache = {}
 
     def _terms(self, screen_small):
-        """Polynomial terms of the warped screen picture. Cached, because the
-        screen is usually static between frames."""
-        if self._cached_screen is not screen_small:
+        """For one screen picture: its warped view, the polynomial terms of
+        every pixel, the flat areas and the banding slack. Kept for the last
+        few pictures, because the screen is usually static between frames."""
+        key = id(screen_small)
+        if key not in self._cache:
             warped = self.warp_screen(screen_small)
-            self._cached_terms = _features(warped.reshape(-1, 3))
+            terms = _features(warped.reshape(-1, 3))
             # Flat areas: only these are used for fitting, because at edges a
             # one-pixel misalignment looks like a big colour error.
             kernel = np.ones((5, 5), np.uint8)
-            self._cached_flat = cv2.subtract(cv2.dilate(warped, kernel), cv2.erode(warped, kernel)).max(2) < 24
+            flat = cv2.subtract(cv2.dilate(warped, kernel), cv2.erode(warped, kernel)).max(2) < 24
             # How much each pixel would change if the projector colours changed
             # strength: banding hits saturated colours hardest, so they get more slack.
-            self._cached_slack = BAND_SLACK * sum(np.abs(self._cached_terms @ (EXPONENTS[:, k:k + 1] * self.colour_map)) for k in range(3)).reshape(warped.shape)
-            self._cached_screen = screen_small
-        return self._cached_terms, self._cached_flat, self._cached_slack
+            slack = BAND_SLACK * sum(np.abs(terms @ (EXPONENTS[:, k:k + 1] * self.colour_map)) for k in range(3)).reshape(warped.shape)
+            while len(self._cache) >= 6:
+                del self._cache[next(iter(self._cache))]
+            self._cache[key] = (screen_small, warped, terms, flat, slack)  # holding the picture keeps its id unique
+        return self._cache[key][1:]
 
     def _adapt(self, terms, observed, usable, step=4):
         """Today's colour map: the calibrated one, first moved by a colour
@@ -169,13 +173,32 @@ class Predictor:
             delta = cv2.blur(delta.astype(np.float32), (1, 5))
         return (slopes.reshape(h, -1, 3) @ delta[..., None]).reshape(h, w, 3)
 
-    def residual(self, screen_small, frame, skip=None):
+    def _compare(self, observed, predicted, band_slack):
+        """Distance of each observed pixel from the range of predicted values
+        in its neighbourhood (which forgives misalignment and camera
+        sharpening), widened by a quarter of that range and the banding slack."""
+        kernel = np.ones((TOLERANCE, TOLERANCE), np.uint8)
+        low, high = cv2.erode(predicted, kernel), cv2.dilate(predicted, kernel)
+        slack = 0.25 * (high - low) + band_slack
+        return np.maximum(np.maximum(observed - high - slack, low - slack - observed), 0).max(2)
+
+    def residual(self, screen_small, frame, others=(), skip=None):
         """How strongly each working pixel disagrees with the prediction, in
-        grey levels. `skip` marks working pixels to leave out (screen content
-        in motion). Returns (residual, predicted, observed)."""
+        grey levels. `others` are screen pictures from just before and after:
+        where the screen is changing (an animation, the cursor ring), a pixel
+        is accepted if it fits any of them, because the exact moment the
+        camera saw is not known. `skip` marks working pixels to leave out.
+        Returns (residual, predicted, observed)."""
         observed = self.crop_camera(frame)
-        terms, flat, band_slack = self._terms(screen_small)
+        warped, terms, flat, band_slack = self._terms(screen_small)
         usable = self.inside & flat if skip is None else self.inside & flat & ~skip
+        moving = []  # per other picture: its terms and where it differs from this one
+        for other in others:
+            other_warped, other_terms = self._terms(other)[:2]
+            differs = cv2.absdiff(warped, other_warped).max(2) > 12
+            if differs.any():
+                moving.append((other_terms, differs))
+                usable = usable & ~differs
         colour_map = self._adapt(terms, observed, usable)
         predicted = (terms @ colour_map).reshape(observed.shape)
         # d(prediction) / d(log strength of projector colour k): scaling screen
@@ -191,13 +214,14 @@ class Predictor:
             grid = np.nanmedian(ratio[:hh, :ww].reshape(gy, hh // gy, gx, ww // gx), axis=(1, 3))
         grid = np.where(np.isnan(grid), 1.0, np.clip(grid, 0.8, 1.25)).astype(np.float32)
         predicted *= cv2.resize(grid, self.size, interpolation=cv2.INTER_CUBIC)[..., None]
-        # Tolerance for misalignment and camera sharpening: compare against the
-        # local min..max of the prediction, widened by a quarter of that range.
         np.clip(predicted, 0, 255, out=predicted)  # the camera cannot report more than white
-        kernel = np.ones((TOLERANCE, TOLERANCE), np.uint8)
-        low, high = cv2.erode(predicted, kernel), cv2.dilate(predicted, kernel)
-        slack = 0.25 * (high - low) + band_slack
-        residual = np.maximum(np.maximum(observed - high - slack, low - slack - observed), 0).max(2)
+        residual = self._compare(observed, predicted, band_slack)
+        for other_terms, differs in moving:
+            # The same prediction, with the changed pixels swapped for what the other picture shows there.
+            alternative = predicted.copy()
+            rows = differs.ravel()
+            alternative[differs] = np.clip(predicted[differs] + (other_terms[rows] - terms[rows]) @ colour_map, 0, 255)
+            residual = np.minimum(residual, self._compare(observed, alternative, band_slack))
         residual[~self.inside] = 0
         if skip is not None:
             residual[skip] = 0

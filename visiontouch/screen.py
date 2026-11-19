@@ -47,22 +47,17 @@ class Screen:
             return self._frames[-1] if self._frames else (0.0, None)
 
     def at(self, when, window=0.12):
-        """The screen picture at time `when`, plus a mask (half size, or None)
-        of pixels that changed within `window` seconds around it. Changed
-        pixels cannot be compared reliably and are skipped by the engine."""
+        """The screen picture at time `when`, plus the other pictures shown
+        within `window` seconds around it (at most two, nearest first). While
+        the screen is changing the camera may have seen any of them."""
         with self._lock:
             frames = list(self._frames)
         if not frames:
-            return None, None
-        best = min(frames, key=lambda f: abs(f[0] - when))[1]
-        near = {id(f[1]): f[1] for f in frames if abs(f[0] - when) <= window}
-        near.pop(id(best), None)
-        if not near:
-            return best, None
-        changed = np.zeros(best.shape[:2], bool)
-        for other in near.values():
-            changed |= cv2.absdiff(best, other).max(2) > 12
-        return best, changed
+            return None, []
+        frames.sort(key=lambda f: abs(f[0] - when))
+        best = frames[0][1]
+        others = {id(f[1]): f[1] for f in frames[1:] if abs(f[0] - when) <= window and f[1] is not best}
+        return best, list(others.values())[:2]
 
     def close(self):
         self._running = False

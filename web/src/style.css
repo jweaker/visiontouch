@@ -146,7 +146,10 @@ body.desktop #back {
   pointer-events: none;
 }
 
-/* Cursor ring per hand: where the system thinks each hand is. */
+/* Cursor ring per hand: where the system thinks each hand is.
+   Bright colours only. The ring is projected onto the very finger it follows,
+   and a finger is invisible to the camera wherever the projector shows dark:
+   a dark outline would cut the fingertip off and make the pointer wobble. */
 .rings { position: fixed; inset: 0; pointer-events: none; z-index: 1000; }
 .ring {
   position: absolute;
@@ -156,13 +159,13 @@ body.desktop #back {
   height: 3rem;
   margin: -1.5rem;
   border-radius: 50%;
-  border: 0.4rem solid var(--ink);
+  border: 0.4rem solid var(--tomato);
   box-shadow: 0 0 0 0.2rem #fff, inset 0 0 0 0.2rem #fff; /* white halo: visible on any colour */
   /* dwell click progress: fills clockwise while a pointing hand holds still (pointers.ts) */
-  background: conic-gradient(var(--cobalt) calc(var(--dwell, 0) * 1turn), transparent 0);
+  background: conic-gradient(var(--sun) calc(var(--dwell, 0) * 1turn), transparent 0);
   transition: transform 50ms linear, width 0.1s, height 0.1s, margin 0.1s;
 }
-.ring.down { background: var(--tomato); border-color: var(--ink); width: 2.2rem; height: 2.2rem; margin: -1.1rem; }
+.ring.down { background: var(--sun); width: 2.2rem; height: 2.2rem; margin: -1.1rem; }
 .ring.palm { width: 7rem; height: 7rem; margin: -3.5rem; border-style: dashed; border-color: var(--pink); }
 
 /* Press feedback */

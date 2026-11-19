@@ -205,18 +205,13 @@ class Engine:
             time.sleep(0.02)
             return None
         self._frame_number, self._frame_time = number, when
-        screen, changed = self.screen.at(when - self.latency)
+        screen, others = self.screen.at(when - self.latency)
         if screen is None:
             return None
         if self._recording:
             self._record(frame, when, screen)
         p = self.predictor
-        ignore = None
-        if changed is not None:  # parts of the screen in motion cannot be compared
-            ignore = cv2.dilate(p.warp_screen(changed.astype(np.uint8)), np.ones((5, 5), np.uint8)) > 0
-        if self.blind is not None:
-            ignore = self.blind if ignore is None else ignore | self.blind
-        residual, predicted, observed = p.residual(screen, frame, ignore)
+        residual, predicted, observed = p.residual(screen, frame, others or (), self.blind)
         mask, labels, blobs = clean_mask(residual, self.sensitivity)
         # If most of the picture disagrees with the prediction for seconds on
         # end, it is not a hand: the camera or the projector has moved.
