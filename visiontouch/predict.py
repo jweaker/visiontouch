@@ -25,7 +25,7 @@ SCREEN_SCALE = 0.5  # the screen picture is handled at half resolution
 # Tuning knobs for the banding correction.
 ROW_RIDGE = 0.05  # how strongly per-row colour strengths are held at "no change"
 ROW_LIMIT = 0.3  # largest allowed change in a row
-BAND_SLACK = 0.04  # extra tolerance where banding would change the pixel most
+BAND_SLACK = 0.07  # extra tolerance where banding would change the pixel most
 CALIBRATION_PULL = 1e-2  # smoothness of the calibrated colour map
 NO_CHANGE = np.vstack([np.eye(3), np.zeros((1, 3))]).astype(np.float32)  # exposure matrix + offset
 EXPONENTS = np.float32([(i, j, k) for i in range(4) for j in range(4) for k in range(4) if i + j + k <= 3])
@@ -68,11 +68,21 @@ class Predictor:
         self.screen_to_work = cam_to_work @ screen_to_cam  # full-resolution screen pixels -> working pixels
         self.span = float(np.linalg.norm(quad[1] - quad[0]))  # width of the projected picture in camera pixels
         self._small_to_work = self.screen_to_work @ np.diag([1 / SCREEN_SCALE, 1 / SCREEN_SCALE, 1.0])
-        small = (int(w * SCREEN_SCALE), int(h * SCREEN_SCALE))
-        inside = cv2.warpPerspective(np.full(small[::-1], 255, np.uint8), self._small_to_work, self.size)
-        self.inside = cv2.erode(inside, np.ones((5, 5), np.uint8)) > 0
+        self._screen_size = screen_size
+        self.set_area(np.eye(3))
         self.colour_map = None  # 20 polynomial terms x 3 camera channels, from calibration
         self._cached_screen = None
+
+    def set_area(self, content_to_screen):
+        """Restrict detection to the content box (the whole screen for an
+        identity matrix; smaller under keystone correction, where the rest of
+        the projector's picture is black and shows nothing)."""
+        w, h = self._screen_size
+        corners = cv2.perspectiveTransform(np.float32([[[0, 0], [w, 0], [w, h], [0, h]]]), self.screen_to_work @ content_to_screen)[0]
+        inside = cv2.fillConvexPoly(np.zeros(self.size[::-1], np.uint8), corners.round().astype(np.int32), 255)
+        # The outermost pixels of the picture are never compared: a small
+        # misalignment there shows the dark wall instead of the picture.
+        self.inside = cv2.erode(inside, np.ones((9, 9), np.uint8), borderType=cv2.BORDER_CONSTANT, borderValue=0) > 0
 
     def warp_screen(self, screen_small):
         """Half-resolution screen picture -> working view, as the camera would frame it."""
@@ -141,8 +151,10 @@ class Predictor:
         error, trusted = error[:, ::step], usable[:, ::step].copy()
         s = slopes[:, ::step].reshape(h, -1, 3)  # per row: one equation per pixel and channel
         e = error.reshape(h, -1, 1)
-        trusted &= cv2.absdiff(error, 0.0).max(2) < 60
-        for limit in (None, 25):  # second pass: drop what the first pass could not explain
+        # First pass uses every pixel, because banding in a saturated colour is
+        # a large error too; the second pass drops what banding cannot explain
+        # (a hand or a shadow) and solves again.
+        for limit in (None, 25):
             if limit:
                 trusted &= cv2.absdiff(error, (s @ delta[..., None]).reshape(error.shape)).max(2) < limit
             weighted = (s * np.repeat(trusted, 3, axis=1)[..., None]).transpose(0, 2, 1)

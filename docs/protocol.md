@@ -20,7 +20,7 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 | `{"t":"mask","w":64,"h":36,"b64":"..."}` | Silhouette of everything in front of the screen, row-major, one byte per cell (0 or 255), base64. Sent about 15/s after `subscribe_mask`. |
 | `{"t":"pattern","id":7,"url":"/pattern/7.png"}` | Show this image full-window, unwarped, on top of everything, at 1:1 pixels. `url: null` removes it. Used for calibration. |
 | `{"t":"warp","m":[9 numbers]}` | Row-major 3×3 homography mapping content-box pixels to window pixels (keystone correction). `m: null` means identity. |
-| `{"t":"state","calibrated":true,"camera":"MacBook","fps":29.8,"latency_ms":110,"mode":"apps","message":""}` | Engine status, sent on change and once a second. |
+| `{"t":"state","calibrated":true,"camera":"MacBook","fps":29.8,"latency_ms":110,"mode":"apps","keystone":true,"message":""}` | Engine status, sent on change and once a second. |
 
 ## Stage → engine
 
@@ -31,6 +31,7 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 | `{"t":"cmd","name":"calibrate"}` | Run calibration. |
 | `{"t":"cmd","name":"mode","value":"apps"}` | `apps`: pointers drive the stage. `desktop`: pointers drive the OS mouse. |
 | `{"t":"cmd","name":"subscribe_mask","value":true}` | Start or stop mask messages. |
+| `{"t":"cmd","name":"keystone","value":true}` | Turn automatic keystone correction on or off (the engine answers with a `warp`). |
 | `{"t":"cmd","name":"camera","value":"0"}` | Switch camera source. |
 | `{"t":"log","name":"accuracy","data":{...}}` | Append a record to the engine's run log (used by the accuracy test app). |
 

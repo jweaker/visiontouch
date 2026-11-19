@@ -14,6 +14,7 @@ import numpy as np
 from .calibrate import colour_tiles, find_homography, marker_pattern
 from .camera import Camera
 from .hands import Landmarker, clean_mask, find_tips, read_pose
+from .keystone import correction, find_frame
 from .predict import SCREEN_SCALE, Predictor
 from .screen import Screen
 from .track import Tracker
@@ -37,6 +38,7 @@ class Engine:
         self.mode, self.mask_wanted, self.message = "apps", False, ""
         self.fps, self.latency, self.predictor = 0.0, 0.2, None
         self.mouse = None
+        self.keystone, self.warp = True, np.eye(3)  # warp: content box pixels -> screen pixels
         self._frame_number, self._count = 0, 0
         self._open_camera(camera)
 
@@ -53,10 +55,11 @@ class Engine:
         frame, _, _ = self.camera.read(timeout=10)
         if saved.exists() and frame is not None:
             data = np.load(saved)
-            if tuple(data["screen"]) == self.screen.size and tuple(data["camera"]) == frame.shape[1::-1]:
+            if "warp" in data and tuple(data["screen"]) == self.screen.size and tuple(data["camera"]) == frame.shape[1::-1]:
                 self.predictor = Predictor(data["H"], self.screen.size, frame.shape[1::-1])
                 self.predictor.colour_map = data["colour_map"]
-                self.latency = float(data["latency"])
+                self.latency, self.warp = float(data["latency"]), data["warp"]
+                self._send_warp()
 
     def _say(self, message):
         self.message = message
@@ -66,7 +69,27 @@ class Engine:
     def _send_state(self):
         self.server.send({"t": "state", "calibrated": self.predictor is not None, "camera": self.source,
                           "fps": round(self.fps, 1), "latency_ms": round(self.latency * 1000), "mode": self.mode,
-                          "message": self.message})
+                          "keystone": self.keystone, "message": self.message})
+
+    def _send_warp(self):
+        """Tell the stage how to pre-distort its content box (keystone correction)."""
+        if self.predictor is not None:
+            self.predictor.set_area(self.warp if self.keystone else np.eye(3))
+        if not self.keystone or self.predictor is None or not self.server.window:
+            return self.server.send({"t": "warp", "m": None})
+        # The matrix is in screen pixels; the stage works in window (CSS) pixels.
+        scale = np.diag([self.server.window[0] / self.screen.size[0], self.server.window[1] / self.screen.size[1], 1.0])
+        self.server.send({"t": "warp", "m": (scale @ self.warp @ np.linalg.inv(scale)).ravel().tolist()})
+
+    def _to_content(self, screen_point):
+        """Screen pixels -> position in the content box, 0..1."""
+        matrix = np.linalg.inv(self.warp) if self.keystone else np.eye(3)
+        return _apply(matrix, screen_point) / self.screen.size
+
+    def _to_screen(self, pointer):
+        """A pointer (content box, 0..1) -> screen pixels."""
+        point = (pointer["x"] * self.screen.size[0], pointer["y"] * self.screen.size[1])
+        return _apply(self.warp, point) if self.keystone else np.array(point)
 
     def _fresh_frame(self, wait):
         """A camera frame taken after waiting `wait` seconds (lets a new pattern arrive)."""
@@ -100,13 +123,19 @@ class Engine:
             small = cv2.resize(tiles, None, fx=SCREEN_SCALE, fy=SCREEN_SCALE, interpolation=cv2.INTER_AREA)
             pairs.append((small, self._fresh_frame(0.9 if seed == 0 else 0.6)))
         predictor.calibrate_colour(pairs)
-        self.latency = self._measure_latency(predictor)
+        self.latency = self._measure_latency(predictor)  # leaves a white screen up
+        # Keystone: look for the projection screen's frame around the white picture.
+        quad = cv2.perspectiveTransform(np.float32([[[0, 0], [w, 0], [w, h], [0, h]]]), np.linalg.inv(best[0]))[0]
+        screen_frame = find_frame(self._fresh_frame(0.5), quad)
+        self.warp = correction(best[0], (w, h), frame.shape[1::-1], screen_frame)
         self.server.show(None)
         self.predictor = predictor
         STORE.mkdir(exist_ok=True)
         np.savez(self._saved, H=best[0], colour_map=predictor.colour_map, latency=self.latency,
-                 screen=self.screen.size, camera=frame.shape[1::-1])
-        self._say(f"Calibrated: {best[2]} markers, {best[1]:.1f} px error, {self.latency * 1000:.0f} ms delay")
+                 screen=self.screen.size, camera=frame.shape[1::-1], warp=self.warp)
+        self._send_warp()
+        straight = "squared to the screen frame" if screen_frame is not None else "squared to the camera's view"
+        self._say(f"Calibrated: {best[2]} markers, {best[1]:.1f} px error, {self.latency * 1000:.0f} ms delay, {straight}")
         return True
 
     def _measure_latency(self, predictor):
@@ -160,8 +189,7 @@ class Engine:
                 if points is not None:
                     pose, position = read_pose(points)
                     drawn.append(points)
-            x, y = _apply(p.cam_to_screen, position) / self.screen.size
-            detections.append({"pos": (x, y), "pose": pose})
+            detections.append({"pos": self._to_content(_apply(p.cam_to_screen, position)), "pose": pose})
         pointers, gestures = self.tracker.update(detections, when)
 
         self.server.send({"t": "pointers", "p": pointers})
@@ -171,7 +199,8 @@ class Engine:
             self._drive_mouse(pointers)
         self._count += 1
         if self.mask_wanted and self._count % 2 == 0:
-            to_grid = np.diag([MASK_GRID[0] / self.screen.size[0], MASK_GRID[1] / self.screen.size[1], 1.0]) @ np.linalg.inv(p.screen_to_work)
+            to_content = np.linalg.inv(self.warp) if self.keystone else np.eye(3)
+            to_grid = np.diag([MASK_GRID[0] / self.screen.size[0], MASK_GRID[1] / self.screen.size[1], 1.0]) @ to_content @ np.linalg.inv(p.screen_to_work)
             grid = cv2.warpPerspective(mask.astype(np.uint8) * 255, to_grid, MASK_GRID, flags=cv2.INTER_AREA)
             self.server.send({"t": "mask", "w": MASK_GRID[0], "h": MASK_GRID[1], "b64": __import__("base64").b64encode(np.where(grid > 60, 255, 0).astype(np.uint8).tobytes()).decode()})
         if self._count % 3 == 0:
@@ -194,7 +223,7 @@ class Engine:
             for point in points:
                 cv2.circle(overlay, tuple(_apply(cam_to_work, point).astype(int)), 2, (255, 200, 0), -1)
         for pointer in pointers:
-            centre = _apply(p.screen_to_work, (pointer["x"] * self.screen.size[0], pointer["y"] * self.screen.size[1])).astype(int)
+            centre = _apply(p.screen_to_work, self._to_screen(pointer)).astype(int)
             cv2.circle(overlay, tuple(centre), 9, (0, 0, 255) if pointer["down"] else (0, 255, 255), 2)
         self.server.debug("overlay", overlay)
 
@@ -210,8 +239,8 @@ class Engine:
                 self._mouse_down = False
             return
         first = pointers[0]
-        self.mouse.moveTo(self.screen.origin[0] + first["x"] * self.screen.size[0],
-                          self.screen.origin[1] + first["y"] * self.screen.size[1])
+        x, y = self._to_screen(first)
+        self.mouse.moveTo(self.screen.origin[0] + x, self.screen.origin[1] + y)
         if first["down"] != self._mouse_down:
             (self.mouse.mouseDown if first["down"] else self.mouse.mouseUp)()
             self._mouse_down = first["down"]
@@ -222,6 +251,7 @@ class Engine:
             with open(STORE / "log.jsonl", "a") as out:
                 out.write(json.dumps({"time": time.time(), **m}) + "\n")
         elif m.get("t") == "hello":
+            self._send_warp()
             self._send_state()
         elif m.get("t") == "cmd":
             name, value = m.get("name"), m.get("value")
@@ -231,6 +261,9 @@ class Engine:
                 self.mode = value
             elif name == "subscribe_mask":
                 self.mask_wanted = bool(value)
+            elif name == "keystone":
+                self.keystone = bool(value)
+                self._send_warp()
             elif name == "camera":
                 try:
                     self._open_camera(value)

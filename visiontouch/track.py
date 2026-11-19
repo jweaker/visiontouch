@@ -10,6 +10,7 @@ import numpy as np
 
 LEAD = 0.06  # seconds of motion to predict ahead, to offset camera delay
 LOST_AFTER = 0.3  # seconds without a detection before a pointer is dropped
+CONFIRM = 3  # detections in a row before a pointer is reported (false blobs flicker)
 MATCH_RADIUS = 0.25  # a detection this far (fraction of screen width) from a pointer is a new hand
 DWELL_RADIUS, DWELL_TIME, TAP_TIME = 0.025, 0.8, 0.15  # hold still this long to click
 SWIPE_DISTANCE, SWIPE_TIME, SWIPE_COOLDOWN = 0.3, 0.5, 1.0
@@ -39,8 +40,8 @@ class Kalman:
 
 class Pointer:
     def __init__(self, number, position, now):
-        self.id, self.filter, self.seen = number, Kalman(position), now
-        self.pose, self.down = "point", False
+        self.id, self.filter, self.seen, self.hits = number, Kalman(position), now, 0
+        self.pose, self.down, self.candidate, self.pending = "point", False, "point", 0
         self.anchor, self.anchor_time, self.tap_until, self.armed = np.array(position), now, 0.0, True
         self.trail = deque()  # (time, x) for swipe detection
 
@@ -64,8 +65,15 @@ class Tracker:
                 near = Pointer(self._next_id, position, now)
                 self._next_id += 1
                 self.pointers.append(near)
-            near.seen, near.pose = now, det.get("pose") or "point"
-        self.pointers = [p for p in self.pointers if now - p.seen < LOST_AFTER]
+            pose = det.get("pose") or "point"
+            # A pose must repeat before it replaces the old one: landmark poses flicker.
+            near.pending = near.pending + 1 if pose == near.candidate else 1
+            near.candidate = pose
+            if near.pending >= 2:
+                near.pose = pose
+            near.seen, near.hits = now, near.hits + 1
+        # Drop pointers that vanished, and unconfirmed ones the moment they miss a frame.
+        self.pointers = [p for p in self.pointers if now - p.seen < (LOST_AFTER if p.hits >= CONFIRM else 1e-6)]
 
         gestures = []
         for p in self.pointers:
@@ -88,7 +96,7 @@ class Tracker:
                 p.trail.append((now, position[0]))
         out = [{"id": p.id, "x": round(float(np.clip(p.filter.ahead(LEAD)[0], 0, 1)), 4),
                 "y": round(float(np.clip(p.filter.ahead(LEAD)[1], 0, 1)), 4), "down": bool(p.down), "pose": p.pose}
-               for p in self.pointers if now - p.seen < 0.1]
+               for p in self.pointers if now - p.seen < 0.1 and p.hits >= CONFIRM]
         return out, gestures
 
 
@@ -109,8 +117,13 @@ if __name__ == "__main__":  # self-check
     assert sum(np.diff(np.array(downs, int)) == 1) == 1, downs
     # A pinch is down immediately; a second hand gets a new id; a fast sweep is a swipe.
     out, _ = tracker.update([{"pos": (0.5, 0.5), "pose": "pinch"}, {"pos": (0.1, 0.9)}], 5.1)
-    assert out[0]["down"] and not out[1]["down"] and out[0]["id"] != out[1]["id"], out
+    assert len(out) == 1 and not out[0]["down"], out  # one pinch frame could be a flicker
+    out, _ = tracker.update([{"pos": (0.5, 0.5), "pose": "pinch"}, {"pos": (0.1, 0.9)}], 5.12)
+    assert len(out) == 1 and out[0]["down"], out  # the new hand is not reported until confirmed
+    for i in range(3):
+        out, _ = tracker.update([{"pos": (0.5, 0.5), "pose": "pinch"}, {"pos": (0.1, 0.9)}], 5.13 + i / 30)
+    assert len(out) == 2 and out[0]["id"] != out[1]["id"] and not out[1]["down"], out
     tracker = Tracker()
-    names = [g for i in range(12) for g in tracker.update([{"pos": (0.2 + 0.05 * i, 0.5), "pose": "palm"}], 10 + i / 30)[1]]
+    names = [g for i in range(14) for g in tracker.update([{"pos": (0.1 + 0.05 * i, 0.5), "pose": "palm"}], 10 + i / 30)[1]]
     assert names == ["swipe_right"], names
     print("ok")

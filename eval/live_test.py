@@ -48,6 +48,8 @@ def main(server):
     engine = Engine(server, CAMERA)
     assert engine.calibrate(), engine.message
     print(engine.message, flush=True)
+    engine.keystone = False  # this test works in plain screen pixels
+    engine._send_warp()
     real, pretend = engine.screen, PretendScreen(engine.screen)
     rng = np.random.default_rng(3)
     pictures = contents()
@@ -98,4 +100,5 @@ def main(server):
     engine.camera.close()
 
 
-run(main)
+if __name__ == "__main__":
+    run(main)

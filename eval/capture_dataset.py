@@ -65,4 +65,5 @@ def main(server):
         cam.close()
 
 
-run(main)
+if __name__ == "__main__":
+    run(main)
