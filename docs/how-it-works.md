@@ -125,6 +125,16 @@ The screenshot is warped into the camera's view with the homography (`cv2.warpPe
 
 **Main parameter.** The neighbourhood size (5×5). Larger forgives more misalignment but also hides thin fingers on busy content.
 
+### 4e. When the screen itself is changing
+
+**What it does.** Games move, buttons light up, and the app draws a cursor ring that follows your finger. The camera frame is about 0.2 s old, and we cannot know exactly which screen picture it saw. So when the screenshots just before and after differ, each changed pixel is compared with *all* of them and the smallest residual wins (`others` in `Predictor.residual`). A pixel that fits the old or the new picture is fine. A hand fits neither, so it is still found.
+
+**Why.** Our first version simply ignored changed pixels. That blinded the engine exactly at the fingertip, because the cursor ring changes there all the time. In a simulated test the pointer then wobbled by 70 px and never clicked.
+
+**A rule for the apps that follows from the physics.** A finger is invisible to the camera wherever the projector shows something dark, because it receives no light there. So nothing dark may be drawn at the fingertip: the cursor ring is bright (a dark outline cut the fingertip off from the hand), and the Board draws in blue by default (with black ink the pen trailed about 40 px behind the finger in simulation). Both cases are regression tests in `tests/test_simulated_rig.py`.
+
+**Lecture.** Image subtraction, done against more than one reference image, with a pixel-wise minimum (image arithmetic).
+
 ### Why each step is there: the ablation ("alternative methods")
 
 We switched the steps on one at a time and scored all 23 test pictures, 3 frames each, for both cameras (`eval/experiments.py`). Note that the predictor's tuning knobs were adjusted during development on part of this same dataset, so these offline numbers are on development data, not on an unseen test set. The live-rig results use newly generated hands. Variant (a) is the simplest alternative: plain subtraction of the warped screenshot after one global straight-line brightness fit (`camera = gain × screen + offset`). The first measure uses the real thresholds and morphology. The second is threshold-free: how many hand pixels are found if only 1 % of clean pixels may be flagged.

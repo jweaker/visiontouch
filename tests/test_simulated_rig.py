@@ -39,6 +39,7 @@ class SimulatedRig:
         self.content = np.full((H, W, 3), 235, np.uint8)  # what the stage shows otherwise
         self.in_front = None  # mask of something between projector and wall (content pixels)
         self.frames, self.rng = 0, np.random.default_rng(0)
+        self.recent = []  # the last few screen pictures, as real screen capture keeps them
 
     # stage server
     def show(self, image):
@@ -56,7 +57,13 @@ class SimulatedRig:
         return self.content if self.pattern is None else self.pattern
 
     def at(self, when, window=0.12):
-        return cv2.resize(self._on_screen(), None, fx=SCREEN_SCALE, fy=SCREEN_SCALE, interpolation=cv2.INTER_AREA), None
+        """The picture on screen now, plus the different pictures shown just before."""
+        now = cv2.resize(self._on_screen(), None, fx=SCREEN_SCALE, fy=SCREEN_SCALE, interpolation=cv2.INTER_AREA)
+        if self.recent and np.array_equal(self.recent[-1], now):
+            now = self.recent[-1]
+        else:
+            self.recent = (self.recent + [now])[-3:]
+        return now, [p for p in self.recent[:-1] if p.shape == now.shape]
 
     def latest(self):
         return time.monotonic(), self.at(0)[0]
@@ -117,6 +124,49 @@ def test_calibrate_then_find_a_fingertip():
     assert presses == 1, f"expected one dwell click, saw {presses}"
 
 
+def _arm(tip):
+    """Mask of an arm reaching in from the bottom edge, fingertip at `tip` (content pixels)."""
+    arm = np.zeros((H, W), np.uint8)
+    cv2.line(arm, (int(tip[0] + 120), H + 20), (int(tip[0] + 14), int(tip[1] + 60)), 255, 60)
+    cv2.line(arm, (int(tip[0] + 14), int(tip[1] + 60)), (int(tip[0]), int(tip[1] + 9)), 255, 18)
+    return arm
+
+
+def test_the_apps_own_feedback_does_not_disturb_the_pointer():
+    """The stage draws a cursor ring at the pointer and, on the board, ink under
+    a moving finger. Both change the picture exactly where the fingertip is; the
+    pointer must stay on the fingertip all the same. (Both are drawn in bright
+    colours: a finger is invisible to the camera over anything dark.)"""
+    rig = SimulatedRig()
+    engine = Engine(rig, camera=rig, screen=rig, landmarks=False)
+    assert engine.calibrate(), engine.message
+    board = np.full((H, W, 3), 255, np.uint8)
+    rig.content = cv2.warpPerspective(board, engine.warp, (W, H))
+    errors, last, start, frame = [], None, time.monotonic(), 0
+    while (t := time.monotonic() - start) < 5:
+        frame += 1
+        tip = np.array([0.25 * W + 0.08 * W * t, 0.4 * H + 0.12 * H * np.sin(1.5 * t)])  # a wavy stroke
+        rig.in_front = cv2.warpPerspective(_arm(tip), engine.warp, (W, H))
+        pointers = engine.step()
+        if not pointers:
+            last = None
+            continue
+        at = (int(pointers[0]["x"] * W), int(pointers[0]["y"] * H))
+        if t > 1:
+            if last is not None:
+                cv2.line(board, last, at, (255, 85, 51), 18, cv2.LINE_AA)  # blue ink follows the pointer
+            last = at
+            errors.append(np.hypot(at[0] - tip[0], at[1] - tip[1]))
+        picture = board.copy()
+        cv2.ellipse(picture, at, (30, 30), 0, -90, -90 + frame * 40 % 360, (60, 200, 255), -1)  # dwell fill, animating
+        cv2.circle(picture, at, 30, (71, 99, 255), 8)  # the cursor ring
+        rig.content = cv2.warpPerspective(picture, engine.warp, (W, H))
+    assert len(errors) > 20, "the hand was lost"
+    assert np.median(errors) < 0.015 * W, f"pointer off by {np.median(errors):.1f} px (median)"
+    assert np.percentile(errors, 90) < 0.03 * W, f"pointer off by {np.percentile(errors, 90):.1f} px (90th percentile)"
+
+
 if __name__ == "__main__":
     test_calibrate_then_find_a_fingertip()
+    test_the_apps_own_feedback_does_not_disturb_the_pointer()
     print("ok")

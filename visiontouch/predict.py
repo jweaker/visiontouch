@@ -17,6 +17,8 @@ disagrees (a hand, an arm, their shadow).
   5. Residual: distance of each observed pixel from the range of predicted
      values in its neighbourhood, which forgives small misalignment and blur.
 """
+import warnings
+
 import cv2
 import numpy as np
 
@@ -210,7 +212,8 @@ class Predictor:
         ratio = np.where(usable[half], observed[half].sum(2) / np.maximum(predicted[half].sum(2), 1), np.nan).astype(np.float32)
         gy, gx = 5, 8
         hh, ww = ratio.shape[0] // gy * gy, ratio.shape[1] // gx * gx
-        with np.errstate(all="ignore"):
+        with warnings.catch_warnings():  # a grid cell with no usable pixel gives NaN, handled below
+            warnings.simplefilter("ignore", RuntimeWarning)
             grid = np.nanmedian(ratio[:hh, :ww].reshape(gy, hh // gy, gx, ww // gx), axis=(1, 3))
         grid = np.where(np.isnan(grid), 1.0, np.clip(grid, 0.8, 1.25)).astype(np.float32)
         predicted *= cv2.resize(grid, self.size, interpolation=cv2.INTER_CUBIC)[..., None]
