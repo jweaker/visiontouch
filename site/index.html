@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VisionTouch: Smart Projector Board</title>
+<meta name="description" content="A free desktop app that turns any projector into a touch board with one ordinary camera: a laptop webcam, a USB webcam or a phone.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fff6e6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#12102b" media="(prefers-color-scheme: dark)">
+<meta property="og:type" content="website">
+<meta property="og:title" content="VisionTouch: Smart Projector Board">
+<meta property="og:description" content="Turn any projector into a touch board with one ordinary camera. Free for macOS, Windows and Linux.">
+<meta property="og:url" content="https://jweaker.github.io/visiontouch/">
+<meta property="og:image" content="https://jweaker.github.io/visiontouch/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Illustration of a hand pointing at the VisionTouch launcher projected on a wall, next to the words: Turn any projector into a touch board.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script src="main.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top wrap">
+  <a class="brand" href="#top" aria-label="VisionTouch, back to top">
+    <img src="assets/icon.svg" alt="" width="40" height="40">
+    <span>VisionTouch</span>
+  </a>
+  <nav aria-label="Sections">
+    <ul>
+      <li><a href="#how">How it works</a></li>
+      <li><a href="#apps">Apps</a></li>
+      <li><a href="#results">Results</a></li>
+      <li><a href="https://github.com/jweaker/visiontouch">Source</a></li>
+      <li><a class="nav-cta" href="#download">Download</a></li>
+    </ul>
+  </nav>
+</header>
+
+<main id="main">
+
+<section class="hero wrap" id="top" aria-labelledby="hero-title">
+  <div class="hero-copy">
+    <p class="kicker">Smart Projector Board</p>
+    <h1 id="hero-title">Turn any projector into a <em>touch board.</em></h1>
+    <p class="lede">With one ordinary camera: a laptop webcam, a USB webcam or a phone. VisionTouch knows what it is projecting, predicts what the camera should see, and treats whatever differs as your hand.</p>
+    <div class="cta">
+      <a class="btn primary" id="hero-get" href="#download">Download, it's free</a>
+      <a class="btn" href="#how">How it works</a>
+    </div>
+    <ul class="chips" aria-label="Highlights">
+      <li>Calibrates itself in about 10&nbsp;s</li>
+      <li>Straightens a crooked picture</li>
+      <li>Recalibrates if the camera is bumped</li>
+    </ul>
+  </div>
+
+  <figure class="scene">
+    <svg viewBox="0 0 1000 680" role="img" aria-labelledby="scene-title">
+      <title id="scene-title">Illustration: a projector throws the VisionTouch launcher onto a wall, a camera watches it, and a hand points at the Board tile while a cursor ring fills up.</title>
+      <defs>
+        <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.6" class="dot"/></pattern>
+        <clipPath id="wallclip"><rect x="10" y="10" width="972" height="652" rx="30"/></clipPath>
+        <clipPath id="pic"><rect x="140" y="150" width="720" height="405" rx="8"/></clipPath>
+      </defs>
+      <rect class="wall-shadow" x="22" y="22" width="972" height="652" rx="30"/>
+      <rect class="wall" x="10" y="10" width="972" height="652" rx="30"/>
+      <rect x="10" y="10" width="972" height="652" rx="30" fill="url(#dots)"/>
+      <polygon class="beam" points="486,78 514,78 860,150 860,555 140,555 140,150"/>
+      <g class="projector">
+        <rect x="446" y="26" width="108" height="50" rx="14"/>
+        <circle class="lens" cx="500" cy="72" r="13"/>
+      </g>
+      <image href="assets/launcher.webp" x="140" y="150" width="720" height="405" clip-path="url(#pic)" preserveAspectRatio="none"/>
+      <rect class="pic-edge" x="140" y="150" width="720" height="405" rx="8"/>
+      <rect class="hot" x="168" y="226" width="330" height="182" rx="16"/>
+      <g class="camera">
+        <line class="sight" x1="92" y1="596" x2="140" y2="150"/>
+        <line class="sight" x1="92" y1="596" x2="860" y2="555"/>
+        <line class="stand" x1="92" y1="620" x2="92" y2="662"/>
+        <rect x="52" y="572" width="80" height="50" rx="14"/>
+        <circle class="lens" cx="92" cy="597" r="12"/>
+      </g>
+      <g clip-path="url(#wallclip)"><g class="hand">
+        <g class="hand-body">
+          <line x1="1060" y1="760" x2="660" y2="512" stroke-width="78"/>
+          <ellipse cx="604" cy="476" rx="68" ry="56" transform="rotate(-36 604 476)"/>
+          <line x1="585" y1="452" x2="472" y2="362" stroke-width="28"/>
+          <line x1="646" y1="444" x2="628" y2="398" stroke-width="24"/>
+          <circle cx="562" cy="508" r="21"/><circle cx="596" cy="528" r="21"/><circle cx="632" cy="540" r="20"/>
+        </g>
+        <g class="ring" transform="translate(462 352)">
+          <circle class="halo" r="23"/>
+          <circle class="fill" r="10" transform="rotate(-90)" pathLength="100"/>
+          <circle class="edge" r="23"/>
+        </g>
+      </g></g>
+      <g class="tag"><rect x="572" y="34" width="150" height="36" rx="18"/><text x="647" y="58">projector</text></g>
+      <g class="tag"><rect x="150" y="584" width="194" height="36" rx="18"/><text x="247" y="608">webcam or phone</text></g>
+      <g class="tag"><rect x="760" y="588" width="128" height="36" rx="18"/><text x="824" y="612">your hand</text></g>
+    </svg>
+    <figcaption>An illustration. The projected picture is the app's real launcher screen.</figcaption>
+  </figure>
+</section>
+
+<section class="wrap block" id="need" aria-labelledby="need-title">
+  <header class="head"><span class="num">01</span><h2 id="need-title">What you need</h2></header>
+  <ul class="need">
+    <li class="tile" style="--c: var(--sun)">
+      <span class="chip" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="11" rx="3"/><circle cx="15" cy="12.5" r="3"/><path d="M5 11h4"/></svg></span>
+      <h3>A projector</h3>
+      <p>Showing your computer's screen, mirrored or as the main display. A plain wall or pull-down screen works best.</p>
+    </li>
+    <li class="tile" style="--c: var(--cobalt)">
+      <span class="chip" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg></span>
+      <h3>A webcam or phone</h3>
+      <p>A laptop webcam, a USB webcam or a phone, placed so it sees the whole projected picture with a little margin, and kept still.</p>
+    </li>
+    <li class="tile" style="--c: var(--mint)">
+      <span class="chip" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="11" rx="2"/><path d="M2 19h20"/></svg></span>
+      <h3>A computer</h3>
+      <p>macOS 15 or later on Apple silicon, Windows x64, or Linux x64 with an X11 desktop session.</p>
+    </li>
+  </ul>
+</section>
+
+<section class="wrap block" id="how" aria-labelledby="how-title">
+  <header class="head"><span class="num">02</span><h2 id="how-title">How it works</h2></header>
+  <p class="intro">The camera does not see a quiet background: it sees the projected picture, which changes all the time, and your hand is lit by it. So instead of storing a photo of the empty wall, VisionTouch predicts the camera image from what it is projecting, frame by frame.</p>
+  <ol class="steps">
+    <li class="step" style="--c: var(--sun)">
+      <div class="step-text">
+        <span class="step-n">1</span>
+        <h3>Calibrate, about 10 seconds</h3>
+        <p>The projector shows a grid of 60 ArUco markers, a few colour mosaics, and a black and a white flash. From these VisionTouch learns where the picture lands in the camera image (a homography), how the camera sees each colour, and how long the camera and projector lag. It also straightens a crooked picture and recalibrates by itself if the camera or projector is knocked.</p>
+      </div>
+      <figure class="shots one"><img src="assets/step-markers.webp" width="640" height="378" loading="lazy" alt="Arrow plot of the calibration error at each marker corner across the 1920 by 1080 picture: 58 of 60 markers found by the webcam, RMS error 1.22 pixels."><figcaption>Error left at each marker corner (webcam, arrows drawn 40× longer): 58 of 60 markers, 1.22&nbsp;px RMS.</figcaption></figure>
+    </li>
+    <li class="step" style="--c: var(--cobalt)">
+      <div class="step-text">
+        <span class="step-n">2</span>
+        <h3>Predict what the camera should see</h3>
+        <p>Every frame, the screenshot from the matching moment is warped into the camera's view and passed through the learned colour map, then adjusted for the camera's changing exposure and for the rainbow bands a single-chip projector leaves in a rolling-shutter camera.</p>
+      </div>
+      <figure class="shots"><img src="assets/pipe-warped.webp" width="600" height="347" loading="lazy" alt="The slide screenshot warped into the camera's view."><img src="assets/pipe-predicted.webp" width="600" height="347" loading="lazy" alt="The predicted camera image: the same slide with the camera's colours and pastel banding."><figcaption>Screenshot, warped → predicted camera image.</figcaption></figure>
+    </li>
+    <li class="step" style="--c: var(--tomato)">
+      <div class="step-text">
+        <span class="step-n">3</span>
+        <h3>Compare</h3>
+        <p>Each camera pixel is compared with the prediction, with a small tolerance around edges so a one-pixel misalignment is forgiven. Whatever the screenshot cannot explain lights up: your hand and its shadow.</p>
+      </div>
+      <figure class="shots"><img src="assets/pipe-camera.webp" width="600" height="347" loading="lazy" alt="The camera frame: the projected slide with an arm-shaped shadow across it."><img src="assets/pipe-residual.webp" width="600" height="346" loading="lazy" alt="The residual: black everywhere except a bright arm shape."><figcaption>Camera frame → residual.</figcaption></figure>
+    </li>
+    <li class="step" style="--c: var(--mint)">
+      <div class="step-text">
+        <span class="step-n">4</span>
+        <h3>Find the fingertip</h3>
+        <p>Thresholds and morphology clean the difference into a mask. An arm always enters from an edge, so the fingertip is the part of the blob farthest from where it enters. MediaPipe then reads the hand's pose on a crop around the tip: point, pinch, palm or fist.</p>
+      </div>
+      <figure class="shots"><img src="assets/pipe-mask.webp" width="600" height="346" loading="lazy" alt="The binary mask: a white arm shape on black."><img src="assets/pipe-tip.webp" width="600" height="346" loading="lazy" alt="The slide with the found arm outlined, a cross at the found fingertip on top of the true tip, and a square where the arm enters."><figcaption>Mask → fingertip found.</figcaption></figure>
+    </li>
+    <li class="step" style="--c: var(--pink)">
+      <div class="step-text">
+        <span class="step-n">5</span>
+        <h3>Track and press</h3>
+        <p>A Kalman filter smooths the pointer and predicts 60&nbsp;ms ahead to hide part of the delay. Holding still for about 0.8&nbsp;s, or pinching, becomes a press, sent to VisionTouch's apps or to the computer's own mouse.</p>
+      </div>
+      <div class="rings" role="img" aria-label="Three cursor ring states: pointing, filling up while you hold still, and pressed.">
+        <div><span class="r"></span><b>point</b></div>
+        <div><span class="r hold"></span><b>hold still</b></div>
+        <div><span class="r down"></span><b>press</b></div>
+      </div>
+    </li>
+  </ol>
+  <p class="note">Steps 2 to 4 show one real frame from the test rig (webcam, a light slide) with a <strong>synthetic</strong> hand painted into the picture. The full explanation of every stage, with its parameters: <a href="https://github.com/jweaker/visiontouch/blob/main/docs/how-it-works.md">How VisionTouch works</a>.</p>
+</section>
+
+<section class="wrap block" id="apps" aria-labelledby="apps-title">
+  <header class="head"><span class="num">03</span><h2 id="apps-title">The apps</h2></header>
+  <ul class="apps">
+    <li class="app wide" style="--c: var(--cobalt)"><img src="assets/app-board.webp" width="720" height="405" loading="lazy" alt="Board app: a colour palette with eraser and pen sizes on the left and red strokes drawn on cream paper."><h3>Board</h3><p>Draw with your finger. Open your palm to erase.</p></li>
+    <li class="app wide" style="--c: var(--sun)"><img src="assets/app-slides.webp" width="720" height="405" loading="lazy" alt="Slides app: a PDF page titled Touch the wall, with arrows on both sides and a page counter 2 of 7."><h3>Slides</h3><p>Present any PDF. Swipe or tap the edges to change pages, and draw on the page.</p></li>
+    <li class="app" style="--c: var(--pink)"><img src="assets/app-quiz.webp" width="720" height="405" loading="lazy" alt="Quiz app: a question about automatic thresholding with Otsu marked correct."><h3>Quiz</h3><p>Questions on image processing basics.</p></li>
+    <li class="app" style="--c: var(--sky)"><img src="assets/app-memory.webp" width="720" height="405" loading="lazy" alt="Memory app: a grid of twelve cards, two turned over."><h3>Memory</h3><p>Find the six pairs.</p></li>
+    <li class="app" style="--c: var(--mint)"><img src="assets/app-pipeline.webp" width="720" height="405" loading="lazy" alt="Pipeline app: six panels from camera frame to detected fingertips."><h3>Pipeline</h3><p>Watch each processing step live.</p></li>
+    <li class="app" style="--c: var(--tomato)"><img src="assets/app-settings.webp" width="720" height="405" loading="lazy" alt="Settings app: engine status, a Calibrate now button, keystone switch, apps or desktop mouse mode, and camera choice."><h3>Settings</h3><p>Calibrate, keystone, apps or desktop mode, camera.</p></li>
+  </ul>
+  <ul class="more">
+    <li style="--c: var(--tomato)"><b>Balloons</b> Pop as many as you can.</li>
+    <li style="--c: var(--mint)"><b>Catch</b> Catch the stars, avoid the bombs.</li>
+    <li style="--c: var(--cobalt)"><b>Accuracy</b> Tap 20 targets; measures how precisely touches land.</li>
+    <li style="--c: var(--sun)"><b>Desktop mode</b> Moves the computer's real mouse, so you can use any program. A small strip with a "back to apps" button stays on top.</li>
+  </ul>
+  <p class="note">Screenshots of the real app, taken with a simulated camera, so the status values shown in them are not measurements. To go home from any app, hold the home button for one second.</p>
+</section>
+
+<section class="wrap block" id="gestures" aria-labelledby="gestures-title">
+  <header class="head"><span class="num">04</span><h2 id="gestures-title">Gestures</h2></header>
+  <ul class="gestures">
+    <li class="tile" style="--c: var(--cobalt)">
+      <svg class="g" viewBox="0 0 64 64" aria-hidden="true"><path d="M30 56V26a4 4 0 0 1 8 0v18"/><path d="M38 40c0-3 6-3 6 0v4m0-2c0-3 6-3 6 0v6c0 6-4 10-10 10h-6c-4 0-6-2-8-5l-6-9c-2-3 2-6 5-3l5 5"/><path d="M12 14h12M18 8v12" class="acc"/></svg>
+      <h3>Point</h3><p>One finger moves the pointer.</p>
+    </li>
+    <li class="tile" style="--c: var(--sun)">
+      <svg class="g" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="20"/><path class="acc" d="M32 12a20 20 0 0 1 17 30"/><circle cx="32" cy="32" r="4" class="solid"/></svg>
+      <h3>Hold still or pinch</h3><p>Hold about 0.8&nbsp;s to click, or pinch thumb and index. Hold the pinch to drag. To draw without pinching: hold, move, hold again.</p>
+    </li>
+    <li class="tile" style="--c: var(--pink)">
+      <svg class="g" viewBox="0 0 64 64" aria-hidden="true"><path d="M22 34V14a3.5 3.5 0 0 1 7 0v16V10a3.5 3.5 0 0 1 7 0v20V13a3.5 3.5 0 0 1 7 0v20-12a3.5 3.5 0 0 1 7 0v19c0 10-7 18-16 18h-2c-6 0-9-3-12-8l-7-11c-2-3 2-6 5-3z"/></svg>
+      <h3>Open palm</h3><p>Erase on the Board.</p>
+    </li>
+    <li class="tile" style="--c: var(--mint)">
+      <svg class="g" viewBox="0 0 64 64" aria-hidden="true"><path d="M8 32h44"/><path d="M40 20l12 12-12 12"/><path class="acc" d="M8 22h14M8 42h10"/></svg>
+      <h3>Swipe</h3><p>A fast sideways swipe turns to the next or previous slide.</p>
+    </li>
+  </ul>
+  <p class="note">One camera cannot measure depth, so a click is a pause or a pinch, not contact with the wall. Pinch and palm need the hand-pose model.</p>
+</section>
+
+<section class="wrap block" id="download" aria-labelledby="download-title">
+  <header class="head"><span class="num">05</span><h2 id="download-title">Download</h2></header>
+  <div class="platforms">
+    <article class="platform" data-os="mac" style="--c: var(--cobalt)" aria-labelledby="p-mac">
+      <span class="yours">Your system</span>
+      <h3 id="p-mac">macOS</h3>
+      <p class="req">macOS 15 or later, Apple silicon. There is no Intel build: MediaPipe has no Intel macOS wheel.</p>
+      <a class="btn dl" href="https://github.com/jweaker/visiontouch/releases/latest/download/VisionTouch-macos-arm64.zip">Download for Mac <small>.zip</small></a>
+      <h4>First launch</h4>
+      <p>The app is signed ad hoc, not notarized, so Gatekeeper may block it. If you trust the download, try to open it, then choose <b>System Settings → Privacy &amp; Security → Open Anyway</b> and confirm.</p>
+      <dl class="perms">
+        <dt>Camera</dt><dd>to see the projected surface and your hand.</dd>
+        <dt>Screen &amp; System Audio Recording</dt><dd>to capture the displayed image, so it can tell your hand from the projection. It captures the screen image only.</dd>
+        <dt>Accessibility</dt><dd>to move and click the pointer in desktop mode. You may need to switch it on yourself in Privacy &amp; Security, then restart VisionTouch.</dd>
+      </dl>
+    </article>
+    <article class="platform" data-os="windows" style="--c: var(--sky)" aria-labelledby="p-win">
+      <span class="yours">Your system</span>
+      <h3 id="p-win">Windows</h3>
+      <p class="req">Windows x64.</p>
+      <a class="btn dl" href="https://github.com/jweaker/visiontouch/releases/latest/download/VisionTouch-windows-x64.zip">Download for Windows <small>.zip</small></a>
+      <h4>First launch</h4>
+      <p>Extract the archive and run <code>VisionTouch\VisionTouch.exe</code> from the extracted folder; keep its files together.</p>
+      <p>The window uses the Microsoft Edge WebView2 Runtime. If it is missing, install the x64 Evergreen Runtime first: <a href="https://developer.microsoft.com/en-us/microsoft-edge/webview2/#download">Microsoft's WebView2 download</a>.</p>
+    </article>
+    <article class="platform" data-os="linux" style="--c: var(--sun)" aria-labelledby="p-linux">
+      <span class="yours">Your system</span>
+      <h3 id="p-linux">Linux</h3>
+      <p class="req">Linux x64, built on Ubuntu 24.04.</p>
+      <a class="btn dl" href="https://github.com/jweaker/visiontouch/releases/latest/download/VisionTouch-linux-x64.tar.gz">Download for Linux <small>.tar.gz</small></a>
+      <h4>First launch</h4>
+      <p>Extract it and run <code>./VisionTouch/VisionTouch</code> from a terminal. It opens the stage in your default browser: move that window to the projector, go full screen, and keep the VisionTouch process running.</p>
+      <p>Use an X11 session: screen capture and mouse control do not work on native Wayland. A minimal Ubuntu also needs <code>xdg-utils libegl1 libgles2 libx11-6 libxcb1 libxcb-randr0 libxcb-render0 libxcb-shm0 libxcb-xfixes0</code>.</p>
+    </article>
+  </div>
+  <p class="all"><a href="https://github.com/jweaker/visiontouch/releases">All releases</a> · <a href="https://github.com/jweaker/visiontouch#quick-start">Run from source</a></p>
+  <aside class="caveat" aria-label="Build status">
+    <h3>Tested how far?</h3>
+    <p>The Windows and Linux builds have passed only an automated headless self-check; neither has been run against a real projector and camera yet. The macOS build has been checked headlessly on Apple silicon; a normal launch, the permission dialogs and hardware use still need their own test.</p>
+  </aside>
+</section>
+
+<section class="wrap block" id="phone" aria-labelledby="phone-title">
+  <header class="head"><span class="num">06</span><h2 id="phone-title">Use a phone as the camera</h2></header>
+  <div class="phone">
+    <div class="tile" style="--c: var(--sky)">
+      <h3>iPhone, on a Mac</h3>
+      <p>Through Continuity Camera the iPhone appears as an ordinary camera. Pick its number in <b>Settings → Camera</b>, or start with <code>--camera 1</code> (or the next number), whichever shows the iPhone's view.</p>
+    </div>
+    <div class="tile" style="--c: var(--mint)">
+      <h3>Android, over USB</h3>
+      <p>Needs Android 12 or later, <code>adb</code> and <a href="https://github.com/Genymobile/scrcpy">scrcpy</a> installed, and USB debugging switched on. Start with <code>--camera android</code> (or <code>--camera android:SERIAL</code> with several phones). Only the back camera is used; the phone's screen is left alone. If the scrcpy server file is not found, set <code>SCRCPY_SERVER_PATH</code>.</p>
+    </div>
+    <div class="tile tip" style="--c: var(--sun)">
+      <h3>Keep it still</h3>
+      <p>Put the phone on a stand: it must not move after calibration. Below or beside the projector works; a steep angle works too but lowers accuracy.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap block" id="results" aria-labelledby="results-title">
+  <header class="head"><span class="num">07</span><h2 id="results-title">Measured results</h2></header>
+  <aside class="caveat first" aria-label="Read this first">
+    <h3>Read this first</h3>
+    <p>Every hand in these tests is <strong>synthetic</strong>: a hand shape painted into the projected picture and filmed through the real projector and cameras. That tests the vision pipeline under real light and real optics, but not real skin, real 3-D shadows, pinch on a real hand, or a body blocking the camera. <strong>Real-hand measurements are still pending.</strong> The offline numbers come from a recorded dataset that was also used to tune the method.</p>
+  </aside>
+
+  <ul class="stats">
+    <li class="stat" style="--c: var(--cobalt)"><b>6.1&nbsp;%</b><span>of clean pixels wrongly flagged (webcam). Plain subtraction: 91.2&nbsp;%. Phone: 3.7&nbsp;% against 97.5&nbsp;%.</span></li>
+    <li class="stat" style="--c: var(--mint)"><b>88&nbsp;%</b><span>of frames with a hand where the hand is found (webcam); 89&nbsp;% with the phone.</span></li>
+    <li class="stat" style="--c: var(--tomato)"><b>12.1&nbsp;px</b><span>median fingertip error (webcam), 0.63&nbsp;% of the picture's 1920&nbsp;px width. Phone: 10.1&nbsp;px.</span></li>
+    <li class="stat" style="--c: var(--sun)"><b>12 of 16</b><span>picture-and-hand cases on the live rig with a median pointer error within 20&nbsp;px (webcam; phone 14 of 16). No false hand on any clean picture.</span></li>
+    <li class="stat" style="--c: var(--pink)"><b>184&nbsp;ms</b><span>camera and projector delay (webcam; phone 165&nbsp;ms; it varies by a few tens of milliseconds between calibrations). The engine's own step takes 37&nbsp;ms median (phone 41&nbsp;ms).</span></li>
+    <li class="stat" style="--c: var(--sky)"><b>5.3° → 0.11°</b><span>edge tilt of the picture before and after automatic keystone correction (webcam).</span></li>
+  </ul>
+
+  <figure class="ablation">
+    <figcaption><h3>Why each step is there</h3><p>Clean pixels wrongly flagged as hand, webcam, as each step of the method is switched on. Lower is better.</p></figcaption>
+    <ol>
+      <li style="--v: 91.2"><span class="lab">Plain subtraction, one brightness fit</span><span class="bar"><i></i></span><span class="val">91.2&nbsp;%</span></li>
+      <li style="--v: 99.8"><span class="lab">+ colour map</span><span class="bar"><i></i></span><span class="val">99.8&nbsp;%</span></li>
+      <li style="--v: 86.0"><span class="lab">+ exposure adaptation</span><span class="bar"><i></i></span><span class="val">86.0&nbsp;%</span></li>
+      <li style="--v: 32.8"><span class="lab">+ row banding correction</span><span class="bar"><i></i></span><span class="val">32.8&nbsp;%</span></li>
+      <li style="--v: 6.1" class="full"><span class="lab">+ edge tolerance (full method)</span><span class="bar"><i></i></span><span class="val">6.1&nbsp;%</span></li>
+    </ol>
+    <p class="small">The colour map alone does not help, because the camera's exposure at test time differs from calibration time; it pays off once exposure adaptation is added.</p>
+  </figure>
+
+  <div class="limits">
+    <h3>Where it struggles</h3>
+    <ul>
+      <li><b>Busy content.</b> Photos and cluttered desktops cause false detections. Plain backgrounds, slides, drawings and games work best.</li>
+      <li><b>Dark content.</b> A hand over pure black is invisible to this method: there is no projected light to take away.</li>
+      <li><b>Dense text</b> breaks up the hand's outline; on the live rig the dense text page gave the worst results of all pictures.</li>
+      <li><b>Delay.</b> The camera and projector add a noticeable lag; the pointer predicts a little ahead to hide part of it.</li>
+      <li><b>One camera position.</b> Moving the camera or projector needs a new calibration, which VisionTouch tries to do by itself.</li>
+    </ul>
+  </div>
+  <p class="note">Every number on this page, how it was measured, and the full tables: <a href="https://github.com/jweaker/visiontouch/blob/main/docs/report.md">the project report</a>.</p>
+</section>
+
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-brand">
+      <img src="assets/icon.svg" alt="" width="48" height="48">
+      <div>
+        <p class="fname">VisionTouch</p>
+        <p>A Digital Image Processing course project, University of Technology, Iraq.</p>
+      </div>
+    </div>
+    <ul class="foot-links">
+      <li><a href="https://github.com/jweaker/visiontouch">Source code</a></li>
+      <li><a href="https://github.com/jweaker/visiontouch/blob/main/docs/report.md">Report</a></li>
+      <li><a href="https://github.com/jweaker/visiontouch/blob/main/docs/how-it-works.md">How it works</a></li>
+      <li><a href="https://github.com/jweaker/visiontouch/releases">Releases</a></li>
+    </ul>
+    <p class="legal">MIT licence. The hand-landmark model is Google's MediaPipe, Apache License 2.0. Fonts: Bricolage Grotesque and Atkinson Hyperlegible, SIL Open Font License 1.1 (<a href="assets/OFL-bricolage-grotesque.txt">Bricolage licence</a>, <a href="assets/OFL-atkinson-hyperlegible.txt">Atkinson licence</a>). This page sets no cookies and loads nothing from other sites.</p>
+  </div>
+</footer>
+</body>
+</html>
