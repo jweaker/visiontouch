@@ -41,6 +41,11 @@ class Screen:
                     while now - self._frames[0][0] > self._history:
                         self._frames.popleft()
 
+    def latest(self):
+        """(time, picture) of the newest screenshot."""
+        with self._lock:
+            return self._frames[-1] if self._frames else (0.0, None)
+
     def at(self, when, window=0.12):
         """The screen picture at time `when`, plus a mask (half size, or None)
         of pixels that changed within `window` seconds around it. Changed
