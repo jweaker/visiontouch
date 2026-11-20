@@ -12,10 +12,10 @@ import { burst, html } from './ui'
 
 // The content box: everything the user sees, warped as one piece for keystone correction.
 const stage = html(`<div id="stage"><div id="view"></div>
-  <button id="home" aria-label="Hold for home">
+  <button id="home" aria-label="Point here for home">
     <svg viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="42"/><circle class="fill" cx="50" cy="50" r="42" pathLength="100"/></svg>
     <svg class="house" viewBox="0 0 64 64"><path d="M10 30 32 11l22 19M17 25v28h30V25"/></svg>
-    <b>Hold for home</b>
+    <b>Point here for home</b>
   </button></div>`)
 document.body.append(stage)
 const view = stage.querySelector<HTMLElement>('#view')!
