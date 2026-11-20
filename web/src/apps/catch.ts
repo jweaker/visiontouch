@@ -39,7 +39,7 @@ export const catchGame: App = {
     })
     canvas.addEventListener('pointerleave', () => (mouse = null))
 
-    // Silhouette mask: a small grid (e.g. 64x36) of 0/255 covering the content box.
+    // Silhouette mask: a small grid (e.g. 128x72) of 0/255 covering the content box.
     let mask: { w: number; h: number; cells: Uint8Array; at: number } | null = null
     const maskCanvas = document.createElement('canvas')
     send({ t: 'cmd', name: 'subscribe_mask', value: true })

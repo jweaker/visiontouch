@@ -17,7 +17,7 @@ Pointer positions are normalised to the stage **content box**: `x, y ∈ [0, 1]`
 | --- | --- |
 | `{"t":"pointers","p":[{"id":1,"x":0.42,"y":0.31,"down":false,"pose":"point"}]}` | Sent every camera frame (about 30/s). One entry per tracked hand; an empty list means no hands. A hand appears only after 3 detections in a row. `down` is the press state: a pinch, a short dwell tap, or, in `hold` dwell mode, a press that lasts until the next hold. `pose` is `point`, `pinch`, `palm` or `fist`. |
 | `{"t":"gesture","name":"swipe_left"}` | One-shot gesture: `swipe_left`, `swipe_right`. |
-| `{"t":"mask","w":64,"h":36,"b64":"..."}` | Silhouette of everything in front of the screen, row-major, one byte per cell (0 or 255), base64. The grid covers the content box, like pointer coordinates. Sent about 15/s after `subscribe_mask`. |
+| `{"t":"mask","w":128,"h":72,"b64":"..."}` | Silhouette of everything in front of the screen, row-major, one byte per cell (0 or 255), base64. The grid covers the content box, like pointer coordinates. Sent every camera frame after `subscribe_mask`. |
 | `{"t":"pattern","id":7,"url":"/pattern/7.png"}` | Show this image stretched to the full window, unwarped, on top of everything. `url: null` removes it. Used for calibration. |
 | `{"t":"warp","m":[9 numbers]}` | Row-major 3×3 homography mapping content-box pixels to window pixels (keystone correction). `m: null` means identity. |
 | `{"t":"state","calibrated":true,"camera":"MacBook","fps":29.8,"latency_ms":110,"mode":"apps","keystone":true,"sensitivity":1.0,"dwell":"tap","message":""}` | Engine status, sent on change and once a second. |

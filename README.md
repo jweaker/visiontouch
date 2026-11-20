@@ -62,7 +62,7 @@ Put the phone on a stand: it must not move after calibration.
 | Pipeline | Watch each processing step live. |
 | Settings | Calibrate, keystone, apps or desktop mode, detection sensitivity, camera. |
 
-**Desktop mode** (in Settings) moves the computer's real mouse instead, so you can use any program. The window shrinks to a small strip with a "back to apps" button that stays on top. To go home from any app, point at the home button in the top-right corner for one second. A hand does not need to press it; a mouse must keep pressing.
+**Desktop mode** (in Settings) moves the computer's real mouse instead, so you can use any program. The window shrinks to a small strip with a "back to apps" button that stays on top. To go home from any app, point at the home button in the bottom-right corner for one second. A hand does not need to press it; a mouse must keep pressing.
 
 ## Gestures
 

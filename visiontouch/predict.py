@@ -74,7 +74,7 @@ class Predictor:
         self._screen_size = screen_size
         self.set_area(np.eye(3))
         self.colour_map = None  # 20 polynomial terms x 3 camera channels, from calibration
-        self._cache = {}
+        self._cache, self._warps = {}, {}
 
     def set_area(self, content_to_screen):
         """Restrict detection to the content box (the whole screen for an
@@ -108,26 +108,47 @@ class Predictor:
         if sum(len(x) for x in xs) < 500:
             raise ValueError("the camera did not see the colour patterns")
         self.colour_map = _robust_fit(np.concatenate(xs), np.concatenate(ys), pull=CALIBRATION_PULL)
-        self._cache = {}
+        self._cache, self._warps = {}, {}
+
+    def _warped(self, screen_small):
+        """The working view of one screen picture, kept for the pictures of the last second or so."""
+        key = id(screen_small)
+        if key not in self._warps:
+            while len(self._warps) >= 40:
+                del self._warps[next(iter(self._warps))]
+            self._warps[key] = (screen_small, self.warp_screen(screen_small))  # holding the picture keeps its id unique
+        return self._warps[key][1]
+
+    def _slack(self, terms):
+        """How much each pixel would change if the projector colours changed
+        strength: banding hits saturated colours hardest, so they get more slack."""
+        return BAND_SLACK * sum(np.abs(terms @ (EXPONENTS[:, k:k + 1] * self.colour_map)) for k in range(3))
 
     def _terms(self, screen_small):
         """For one screen picture: its warped view, the polynomial terms of
         every pixel, the flat areas and the banding slack. Kept for the last
-        few pictures, because the screen is usually static between frames."""
+        few pictures, because the screen is usually static between frames.
+        A picture that differs only a little from the one before it (a moving
+        cursor) reuses that one's work for all pixels that stayed the same."""
         key = id(screen_small)
         if key not in self._cache:
-            warped = self.warp_screen(screen_small)
-            terms = _features(warped.reshape(-1, 3))
+            warped = self._warped(screen_small)
+            last = next(reversed(self._cache.values()), None)
+            changed = None if last is None else cv2.absdiff(warped, last[1]).any(2)
+            if changed is not None and changed.mean() < 0.2:
+                terms, slack, pixels = last[2].copy(), last[4].copy(), changed.ravel()
+                terms[pixels] = _features(warped[changed])
+                slack[changed] = self._slack(terms[pixels])
+            else:
+                terms = _features(warped.reshape(-1, 3))
+                slack = self._slack(terms).reshape(warped.shape)
             # Flat areas: only these are used for fitting, because at edges a
             # one-pixel misalignment looks like a big colour error.
             kernel = np.ones((5, 5), np.uint8)
             flat = cv2.subtract(cv2.dilate(warped, kernel), cv2.erode(warped, kernel)).max(2) < 24
-            # How much each pixel would change if the projector colours changed
-            # strength: banding hits saturated colours hardest, so they get more slack.
-            slack = BAND_SLACK * sum(np.abs(terms @ (EXPONENTS[:, k:k + 1] * self.colour_map)) for k in range(3)).reshape(warped.shape)
             while len(self._cache) >= 6:
                 del self._cache[next(iter(self._cache))]
-            self._cache[key] = (screen_small, warped, terms, flat, slack)  # holding the picture keeps its id unique
+            self._cache[key] = (screen_small, warped, terms, flat, slack)
         return self._cache[key][1:]
 
     def _adapt(self, terms, observed, usable, step=4):
@@ -188,12 +209,13 @@ class Predictor:
         observed = self.crop_camera(frame)
         warped, terms, flat, band_slack = self._terms(screen_small)
         usable = self.inside & flat if skip is None else self.inside & flat & ~skip
-        moving = []  # per other picture: its terms and where it differs from this one
+        moving = []  # per other picture: its terms where it differs from this one, and which pixels those are
         for other in others:
-            other_warped, other_terms = self._terms(other)[:2]
-            differs = cv2.absdiff(warped, other_warped).max(2) > 12
-            if differs.any():
-                moving.append((other_terms, differs))
+            other_warped = self._warped(other)
+            differs = cv2.inRange(cv2.absdiff(warped, other_warped), (0, 0, 0), (12, 12, 12)) == 0
+            pixels = np.flatnonzero(differs)
+            if len(pixels):
+                moving.append((_features(other_warped.reshape(-1, 3)[pixels]), pixels))
                 usable = usable & ~differs
         colour_map = self._adapt(terms, observed, usable)
         predicted = (terms @ colour_map).reshape(observed.shape)
@@ -217,11 +239,10 @@ class Predictor:
         lowest, highest = predicted, predicted
         if moving:
             lowest, highest = predicted.copy(), predicted.copy()
-            for other_terms, differs in moving:
-                rows = differs.ravel()
-                other = np.clip(predicted[differs] + (other_terms[rows] - terms[rows]) @ colour_map, 0, 255)
-                lowest[differs] = np.minimum(lowest[differs], other)
-                highest[differs] = np.maximum(highest[differs], other)
+            low, high = lowest.reshape(-1, 3), highest.reshape(-1, 3)  # views: one row per pixel
+            for other_terms, pixels in moving:
+                other = np.clip(predicted.reshape(-1, 3)[pixels] + (other_terms - terms[pixels]) @ colour_map, 0, 255)
+                low[pixels], high[pixels] = np.minimum(low[pixels], other), np.maximum(high[pixels], other)
         # Tolerance for misalignment and camera sharpening: compare against the
         # local min..max of that range, widened by a quarter of its width.
         kernel = np.ones((TOLERANCE, TOLERANCE), np.uint8)

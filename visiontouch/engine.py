@@ -25,7 +25,7 @@ from .screen import Screen
 from .track import Tracker
 
 STORE = Path(os.environ.get("VISIONTOUCH_HOME", Path.home() / ".visiontouch"))  # calibration and logs
-MASK_GRID = (64, 36)
+MASK_GRID = (128, 72)
 STRIP = (420, 110)  # size of the stage window in desktop mode
 
 
@@ -270,7 +270,7 @@ class Engine:
         if self.mode == "desktop":
             self._drive_mouse(pointers)
         self._count += 1
-        if self.mask_wanted and self._count % 2 == 0:
+        if self.mask_wanted:
             to_grid = np.diag([MASK_GRID[0] / self.screen.size[0], MASK_GRID[1] / self.screen.size[1], 1.0]) @ np.linalg.inv(self._content()) @ np.linalg.inv(p.screen_to_work)
             grid = cv2.warpPerspective(mask.astype(np.uint8) * 255, to_grid, MASK_GRID, flags=cv2.INTER_AREA)
             self.server.send({"t": "mask", "w": MASK_GRID[0], "h": MASK_GRID[1], "b64": base64.b64encode(np.where(grid > 60, 255, 0).astype(np.uint8).tobytes()).decode()})
