@@ -353,15 +353,15 @@ def mediapipe_firing():
                 arm = cv2.perspectiveTransform(np.float32([[tip["entry"]]]), p.work_to_cam)[0, 0] - cam_tip
                 centre = cam_tip + arm / (np.linalg.norm(arm) + 1e-6) * half * 0.5
                 points = landmarker.detect(f["frame"], centre, half)
-                counts["hand_engine_crop"].append(points is not None)
+                counts["hand_engine_crop"].append(bool(points))
             else:
                 counts["hand_engine_crop"].append(False)
             start = time.perf_counter()
             points = landmarker.detect(f["frame"], true_tip, half)
             crop_ms.append(1000 * (time.perf_counter() - start))
-            counts["hand_true_crop"].append(points is not None)
-            if points is not None:
-                index_tip = cv2.perspectiveTransform(np.float32([[points[8]]]), p.cam_to_screen)[0, 0]
+            counts["hand_true_crop"].append(bool(points))
+            if points:
+                index_tip = cv2.perspectiveTransform(np.float32([[points[0][8]]]), p.cam_to_screen)[0, 0]
                 errors.append(float(np.linalg.norm(index_tip - f["tip"])))
         out[cam] = {key: {"fired": int(sum(v)), "frames": len(v), "rate": float(np.mean(v)) if v else None} for key, v in counts.items()}
         out[cam]["true_crop_index_tip_error_px"] = errors

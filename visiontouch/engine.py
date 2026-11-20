@@ -6,7 +6,9 @@
 import base64
 import json
 import os
+import queue
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -15,7 +17,7 @@ import numpy as np
 
 from .calibrate import colour_tiles, find_homography, marker_pattern
 from .camera import Camera
-from .hands import Landmarker, clean_mask, find_tips, read_pose
+from .hands import Landmarker, clean_mask, find_tips, pointing, read_pose
 from .keystone import correction, find_frame
 from .predict import Predictor
 from .screen import Screen
@@ -206,15 +208,18 @@ class Engine:
         if self._saved.exists():
             (folder / self._saved.name).write_bytes(self._saved.read_bytes())
         self._recording = (folder, [])
+        # Files are written by a helper thread, so that recording does not slow the engine down.
+        self._writes = queue.Queue()
+        threading.Thread(target=lambda: [cv2.imwrite(*job) for job in iter(self._writes.get, None)], daemon=True).start()
 
     def _record(self, frame, when, screen):
         folder, frames = self._recording
         if not frames or frames[-1]["screen_id"] != id(screen):  # the screen changed: store it once
-            cv2.imwrite(str(folder / f"screen_{len(frames):06d}.png"), screen)
+            self._writes.put((str(folder / f"screen_{len(frames):06d}.png"), screen, [cv2.IMWRITE_PNG_COMPRESSION, 1]))
             name = f"screen_{len(frames):06d}.png"
         else:
             name = frames[-1]["screen"]
-        cv2.imwrite(str(folder / f"frame_{len(frames):06d}.jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 92])
+        self._writes.put((str(folder / f"frame_{len(frames):06d}.jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 92]))
         frames.append({"time": when, "screen": name, "screen_id": id(screen)})
         if len(frames) % 30 == 0:
             (folder / "index.json").write_text(json.dumps({"camera": self.source, "screen_size": self.screen.size, "frames": frames}))
@@ -248,21 +253,11 @@ class Engine:
             (dx, dy), confidence = cv2.phaseCorrelate(grey[0], grey[1], cv2.createHanningWindow(p.size, cv2.CV_32F))
             self._drift = self._drift + 1 if confidence > 0.25 and np.hypot(dx, dy) > 2.5 else 0
 
-        detections, drawn = [], []
-        for hand in find_tips(labels, blobs, p.inside):
-            tip = _apply(p.work_to_cam, hand["tip"])
-            pose, position = None, tip
-            if self.landmarker:
-                towards_arm = _apply(p.work_to_cam, hand["entry"]) - tip
-                half = 0.13 * p.span
-                centre = tip + towards_arm / (np.linalg.norm(towards_arm) + 1e-6) * half * 0.5
-                points = self.landmarker.detect(frame, centre, half)
-                # Believe the landmarks only if the hand they describe ends where
-                # the blob ends; otherwise they were imagined on the background.
-                if points is not None and np.linalg.norm(points - tip, axis=1).min() < 0.3 * half:
-                    pose, position = read_pose(points)
-                    drawn.append(points)
-            detections.append({"pos": self._to_content(_apply(p.cam_to_screen, position)), "pose": pose})
+        if self.landmarker:
+            detections, drawn = self._find_hands(frame, mask)
+        else:
+            tips, drawn = [_apply(p.work_to_cam, hand["tip"]) for hand in find_tips(labels, blobs, p.inside)], []
+            detections = [{"pos": self._to_content(_apply(p.cam_to_screen, tip)), "pose": None} for tip in tips]
         pointers, gestures = self.tracker.update(detections, when)
 
         self.server.send({"t": "pointers", "p": pointers})
@@ -278,6 +273,33 @@ class Engine:
         if self._count % 3 == 0 and getattr(self.server, "viewers", 1):  # only while someone is watching
             self._publish_debug(p, observed, predicted, residual, mask, pointers, drawn)
         return pointers
+
+    def _find_hands(self, frame, mask):
+        """Detections for the tracker, and the landmarks seen (for the debug view).
+
+        The hand model looks closely where each known hand was a moment ago,
+        and takes turns searching the left and the right half of the picture
+        for new ones (all the time while no hand is known, now and then
+        otherwise). The pointer is the index fingertip. The model misses a
+        small, far hand in about one frame out of four; while the mask still
+        shows a pointing hand there, the pointer stays where it was."""
+        p = self.predictor
+        to_work, width = np.linalg.inv(p.work_to_cam), mask.shape[1]
+        can_point = lambda spot: pointing(mask, spot, 0.02 * width, 0.3 * width)
+        known = [_apply(p.screen_to_work, self._to_screen({"x": x, "y": y})) for x, y in (t.filter.state[:2] for t in self.tracker.pointers)]
+        looks = [(_apply(p.work_to_cam, centre), 0.13 * p.span) for centre in known]
+        turn, half_width = self._count % (6 if known else 2), width // 2
+        if turn < 2 and mask[:, turn * half_width:(turn + 1) * half_width].any():  # nothing in front of the picture: nothing to search
+            looks.append((_apply(p.work_to_cam, ((turn + 0.5) * half_width, mask.shape[0] / 2)), 0.28 * p.span))
+        seen = [points for look in looks for points in self.landmarker.detect(frame, *look)]
+        spots = [(_apply(to_work, points[8]), points) for points in seen] + [(centre, None) for centre in known]  # hands the model saw come first
+        found = []
+        for spot, points in spots:
+            if can_point(spot) and all(np.linalg.norm(spot - other) > 0.08 * width for other, _ in found):
+                found.append((spot, points))
+        detections = [{"pos": self._to_content(_apply(p.cam_to_screen @ p.work_to_cam, spot)), "pose": read_pose(points) if points is not None else None,
+                       "hand": points is not None} for spot, points in found]
+        return detections, [points for _, points in found if points is not None]
 
     def _publish_debug(self, p, observed, predicted, residual, mask, pointers, landmarks):
         view = observed.clip(0, 255).astype(np.uint8)

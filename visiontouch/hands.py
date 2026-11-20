@@ -4,8 +4,13 @@ Classical path: threshold -> morphology -> connected components -> fingertip.
 An arm always enters the picture from an edge, so the fingertip is the point
 of the blob farthest from where the blob crosses the edge.
 
-Learned path: MediaPipe Hands looks at a zoomed crop around each blob and
-returns 21 landmarks, from which the pose (point, pinch, palm, fist) is read.
+Learned path: MediaPipe Hands searches the picture wherever the mask shows
+something in front of it, which also works with a whole person standing in
+the picture, where the classical rule cannot tell an arm from a head. It
+returns 21 landmarks per hand: the index fingertip is the pointer, and the
+pose (point, pinch, palm, fist) is read from the rest. The mask then decides
+whether that hand can be pointing at all, and vouches for it in the frames
+in which the model misses it.
 """
 from pathlib import Path
 
@@ -18,6 +23,8 @@ GAP = 17  # pieces closer than this (working pixels) count as one blob
 THICK = 7  # a blob must be at least this wide somewhere (working pixels)
 SOLID = 5  # parts of a blob narrower than this (working pixels) cannot be the fingertip
 PALM, FINGER = 9, 26  # the hand's body is at least PALM wide; a finger reaches at most FINGER beyond it
+OUT = 1.0  # a pointing hand is at least this many radii from the centre of the mass in front of the picture
+POSE_SIZE = 45  # wrist-to-knuckle length (camera pixels) below which the pose is not read
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"
 
 
@@ -88,25 +95,42 @@ def find_tips(labels, blobs, inside):
     return hands
 
 
+def pointing(mask, spot, hand, body):
+    """Can a hand at `spot` (working pixels) be pointing?
+
+    Take everything in front of the picture within `body` of the spot: an arm,
+    or a whole person with their shadow. A pointing hand is at the rim of that
+    mass, at the end of an arm; a head, or a hand resting on the chest, is in
+    the middle of it. So the spot must be on the mask (within `hand`), and
+    further from the centre of the mass than OUT times its radius (the radius
+    of a disc of the same area)."""
+    x0, y0 = max(int(spot[0] - body), 0), max(int(spot[1] - body), 0)
+    ys, xs = np.nonzero(mask[y0:max(int(spot[1] + body), 0), x0:max(int(spot[0] + body), 0)])
+    x, y = spot[0] - x0, spot[1] - y0
+    return bool((np.hypot(xs - x, ys - y) <= hand).any()) and np.hypot(x - xs.mean(), y - ys.mean()) >= OUT * np.sqrt(len(xs) / np.pi)
+
+
 class Landmarker:
-    """MediaPipe Hands on a zoomed crop around a blob's fingertip."""
+    """MediaPipe Hands on a square cut out of the camera frame."""
 
     def __init__(self):
         import mediapipe as mp
 
         options = mp.tasks.vision.HandLandmarkerOptions(
             base_options=mp.tasks.BaseOptions(model_asset_path=str(MODEL)),
-            num_hands=1, min_hand_detection_confidence=0.3, min_hand_presence_confidence=0.3,
+            num_hands=2, min_hand_detection_confidence=0.3, min_hand_presence_confidence=0.3,
         )
         self._mp = mp
         self._model = mp.tasks.vision.HandLandmarker.create_from_options(options)
 
     def detect(self, frame, centre, half):
         """Look for a hand in the square of half-size `half` around `centre`
-        (camera pixels). Returns 21 x 2 landmark positions in camera pixels, or None."""
+        (camera pixels). Returns a list with 21 x 2 landmark positions (camera
+        pixels) for every hand found. A hand is found reliably if the square
+        is at most about ten hands wide."""
         x0, y0, side = int(centre[0] - half), int(centre[1] - half), int(2 * half)
         if side < 32:
-            return None
+            return []
         # Cut the square out through an affine map: parts beyond the frame
         # edge are filled in, so the crop stays square and the hand unstretched.
         scale = 320 / side
@@ -114,27 +138,26 @@ class Landmarker:
         crop = cv2.warpAffine(frame, to_crop, (320, 320), borderMode=cv2.BORDER_REPLICATE)
         crop = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
         result = self._model.detect(self._mp.Image(image_format=self._mp.ImageFormat.SRGB, data=np.ascontiguousarray(crop)))
-        if not result.hand_landmarks:
-            return None
-        points = np.array([[p.x, p.y] for p in result.hand_landmarks[0]])
-        return points * side + [x0, y0]
+        return [np.array([[p.x, p.y] for p in hand]) * side + [x0, y0] for hand in result.hand_landmarks]
 
 
 def read_pose(points):
-    """Pose and pointing position from 21 landmarks (any pixel units).
-    Returns (pose, (x, y)): 'pinch' at the thumb/index meeting point, 'palm'
-    and 'fist' at the palm centre, 'point' at the index fingertip."""
+    """Pose from 21 landmarks (camera pixels): 'pinch', 'palm', 'fist' or 'point'.
+    A hand too small in the picture to judge is 'point': its landmarks wobble
+    by about as much as a thumb and a finger are apart."""
     wrist, palm = points[0], points[9]
     size = np.linalg.norm(palm - wrist) + 1e-6
+    if size < POSE_SIZE:
+        return "point"
     extended = [np.linalg.norm(points[tip] - wrist) > 1.25 * np.linalg.norm(points[joint] - wrist)
                 for tip, joint in ((8, 6), (12, 10), (16, 14), (20, 18))]
     if np.linalg.norm(points[4] - points[8]) < 0.35 * size:
-        return "pinch", (points[4] + points[8]) / 2
+        return "pinch"
     if all(extended):
-        return "palm", palm
+        return "palm"
     if not any(extended):
-        return "fist", palm
-    return "point", points[8]
+        return "fist"
+    return "point"
 
 
 if __name__ == "__main__":  # self-check on a synthetic arm
@@ -149,7 +172,12 @@ if __name__ == "__main__":  # self-check on a synthetic arm
     assert np.linalg.norm(find_tips(*clean_mask(residual)[1:], inside)[0]["tip"] - [300, 112]) < 12
     assert not mask[10, 100]
     square = np.zeros((21, 2)); square[9] = [0, -100]; square[[6, 10, 14, 18]] = [0, -150]; square[[8, 12, 16, 20]] = [0, -230]; square[4] = [80, -60]
-    assert read_pose(square)[0] == "palm"
+    assert read_pose(square) == "palm"
     square[4] = square[8] + [5, 5]
-    assert read_pose(square)[0] == "pinch"
+    assert read_pose(square) == "pinch"
+    # A person in the picture: the end of the arm can point, a hand on the chest cannot.
+    person = np.zeros((300, 500), bool)
+    cv2.rectangle(person.view(np.uint8), (200, 120), (320, 299), 1, -1)
+    cv2.line(person.view(np.uint8), (210, 150), (90, 80), 1, 16)
+    assert pointing(person, (90, 80), 10, 160) and not pointing(person, (260, 200), 10, 160) and not pointing(person, (60, 250), 10, 160)
     print("ok")

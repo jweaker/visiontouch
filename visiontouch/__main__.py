@@ -44,7 +44,7 @@ def check(output):
         print("Stage HTML OK", file=output)
 
         blank = np.zeros((64, 64, 3), np.uint8)
-        if Landmarker().detect(blank, (32, 32), 32) is not None:
+        if Landmarker().detect(blank, (32, 32), 32):
             raise RuntimeError("hand landmark model detected a hand in a blank image")
         print("Hand landmark model OK", file=output)
         av.CodecContext.create("h264", "r")
