@@ -143,7 +143,7 @@
       <div class="step-text">
         <span class="step-n">2</span>
         <h3>Predict what the camera should see</h3>
-        <p>Every frame, the screenshot from the matching moment is warped into the camera's view and passed through the learned colour map, then adjusted for the camera's changing exposure and for the rainbow bands a single-chip projector leaves in a rolling-shutter camera.</p>
+        <p>Every frame, the screenshot from the matching moment is warped into the camera's view and passed through the learned colour map, then adjusted for the camera's changing exposure and for the rainbow bands a single-chip projector leaves in a rolling-shutter camera. The delay is only known roughly, so where the screen is changing (a game, the cursor ring) the pictures shown just before and after count too.</p>
       </div>
       <figure class="shots"><img src="assets/pipe-warped.webp" width="600" height="347" loading="lazy" alt="The slide screenshot warped into the camera's view."><img src="assets/pipe-predicted.webp" width="600" height="347" loading="lazy" alt="The predicted camera image: the same slide with the camera's colours and pastel banding."><figcaption>Screenshot, warped → predicted camera image.</figcaption></figure>
     </li>
@@ -159,7 +159,7 @@
       <div class="step-text">
         <span class="step-n">4</span>
         <h3>Find the fingertip</h3>
-        <p>Thresholds and morphology clean the difference into a mask. An arm always enters from an edge, so the fingertip is the part of the blob farthest from where it enters. MediaPipe then reads the hand's pose on a crop around the tip: point, pinch, palm or fist.</p>
+        <p>Thresholds and morphology clean the difference into a mask, and pieces split apart by dark lines in the picture are joined again. An arm always enters from an edge, so the fingertip is the solid part of the blob farthest from where it enters. MediaPipe then reads the hand's pose on a crop around the tip: point, pinch, palm or fist.</p>
       </div>
       <figure class="shots"><img src="assets/pipe-mask.webp" width="600" height="346" loading="lazy" alt="The binary mask: a white arm shape on black."><img src="assets/pipe-tip.webp" width="600" height="346" loading="lazy" alt="The slide with the found arm outlined, a cross at the found fingertip on top of the true tip, and a square where the arm enters."><figcaption>Mask → fingertip found.</figcaption></figure>
     </li>
@@ -186,16 +186,16 @@
     <li class="app wide" style="--c: var(--sun)"><img src="assets/app-slides.webp" width="720" height="405" loading="lazy" alt="Slides app: a PDF page titled Touch the wall, with arrows on both sides and a page counter 2 of 7."><h3>Slides</h3><p>Present any PDF. Swipe or tap the edges to change pages, and draw on the page.</p></li>
     <li class="app" style="--c: var(--pink)"><img src="assets/app-quiz.webp" width="720" height="405" loading="lazy" alt="Quiz app: a question about automatic thresholding with Otsu marked correct."><h3>Quiz</h3><p>Questions on image processing basics.</p></li>
     <li class="app" style="--c: var(--sky)"><img src="assets/app-memory.webp" width="720" height="405" loading="lazy" alt="Memory app: a grid of twelve cards, two turned over."><h3>Memory</h3><p>Find the six pairs.</p></li>
-    <li class="app" style="--c: var(--mint)"><img src="assets/app-pipeline.webp" width="720" height="405" loading="lazy" alt="Pipeline app: six panels from camera frame to detected fingertips."><h3>Pipeline</h3><p>Watch each processing step live.</p></li>
+    <li class="app" style="--c: var(--mint)"><img src="assets/app-pipeline.webp" width="720" height="405" loading="lazy" alt="Pipeline app: panels showing each processing step, from camera frame to detected fingertips."><h3>Pipeline</h3><p>Watch each processing step live.</p></li>
     <li class="app" style="--c: var(--tomato)"><img src="assets/app-settings.webp" width="720" height="405" loading="lazy" alt="Settings app: engine status, a Calibrate now button, keystone switch, apps or desktop mouse mode, and camera choice."><h3>Settings</h3><p>Calibrate, keystone, apps or desktop mode, camera.</p></li>
   </ul>
   <ul class="more">
-    <li style="--c: var(--tomato)"><b>Balloons</b> Pop as many as you can.</li>
+    <li style="--c: var(--tomato)"><b>Balloons</b> Touch balloons to pop as many as you can.</li>
     <li style="--c: var(--mint)"><b>Catch</b> Catch the stars, avoid the bombs.</li>
     <li style="--c: var(--cobalt)"><b>Accuracy</b> Tap 20 targets; measures how precisely touches land.</li>
-    <li style="--c: var(--sun)"><b>Desktop mode</b> Moves the computer's real mouse, so you can use any program. A small strip with a "back to apps" button stays on top.</li>
+    <li style="--c: var(--sun)"><b>Desktop mode</b> Moves the computer's real mouse, so you can use any program. The window shrinks to a small strip with a "back to apps" button that stays on top.</li>
   </ul>
-  <p class="note">Screenshots of the real app, taken with a simulated camera, so the status values shown in them are not measurements. To go home from any app, hold the home button for one second.</p>
+  <p class="note">Screenshots of the real app, taken with a simulated camera, so the status values shown in them are not measurements. To go home from any app, point at the home button in the top-right corner for one second; no press is needed.</p>
 </section>
 
 <section class="wrap block" id="gestures" aria-labelledby="gestures-title">
@@ -207,7 +207,7 @@
     </li>
     <li class="tile" style="--c: var(--sun)">
       <svg class="g" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="20"/><path class="acc" d="M32 12a20 20 0 0 1 17 30"/><circle cx="32" cy="32" r="4" class="solid"/></svg>
-      <h3>Hold still or pinch</h3><p>Hold about 0.8&nbsp;s to click, or pinch thumb and index. Hold the pinch to drag. To draw without pinching: hold, move, hold again.</p>
+      <h3>Hold still or pinch</h3><p>Hold about 0.8&nbsp;s to click, or pinch thumb and index. Hold the pinch to drag. To draw on the Board without pinching: hold, move, hold again.</p>
     </li>
     <li class="tile" style="--c: var(--pink)">
       <svg class="g" viewBox="0 0 64 64" aria-hidden="true"><path d="M22 34V14a3.5 3.5 0 0 1 7 0v16V10a3.5 3.5 0 0 1 7 0v20V13a3.5 3.5 0 0 1 7 0v20-12a3.5 3.5 0 0 1 7 0v19c0 10-7 18-16 18h-2c-6 0-9-3-12-8l-7-11c-2-3 2-6 5-3z"/></svg>
@@ -218,7 +218,7 @@
       <h3>Swipe</h3><p>A fast sideways swipe turns to the next or previous slide.</p>
     </li>
   </ul>
-  <p class="note">One camera cannot measure depth, so a click is a pause or a pinch, not contact with the wall. Pinch and palm need the hand-pose model.</p>
+  <p class="note">One camera cannot measure depth, so a click is a pause or a pinch, not contact with the wall. Balloons pop when a hand touches them, with no press. Pinch and palm need the hand-pose model.</p>
 </section>
 
 <section class="wrap block" id="download" aria-labelledby="download-title">
@@ -292,8 +292,8 @@
     <li class="stat" style="--c: var(--cobalt)"><b>6.1&nbsp;%</b><span>of clean pixels wrongly flagged (webcam). Plain subtraction: 91.2&nbsp;%. Phone: 3.7&nbsp;% against 97.5&nbsp;%.</span></li>
     <li class="stat" style="--c: var(--mint)"><b>88&nbsp;%</b><span>of frames with a hand where the hand is found (webcam); 89&nbsp;% with the phone.</span></li>
     <li class="stat" style="--c: var(--tomato)"><b>12.1&nbsp;px</b><span>median fingertip error (webcam), 0.63&nbsp;% of the picture's 1920&nbsp;px width. Phone: 10.1&nbsp;px.</span></li>
-    <li class="stat" style="--c: var(--sun)"><b>12 of 16</b><span>picture-and-hand cases on the live rig with a median pointer error within 20&nbsp;px (webcam; phone 14 of 16). No false hand on any clean picture.</span></li>
-    <li class="stat" style="--c: var(--pink)"><b>184&nbsp;ms</b><span>camera and projector delay (webcam; phone 165&nbsp;ms; it varies by a few tens of milliseconds between calibrations). The engine's own step takes 37&nbsp;ms median (phone 41&nbsp;ms).</span></li>
+    <li class="stat" style="--c: var(--sun)"><b>12 of 14</b><span>picture-and-hand cases on the live rig with a median pointer error within 20&nbsp;px (webcam; phone 14 of 16). No false hand on any clean picture.</span></li>
+    <li class="stat" style="--c: var(--pink)"><b>281&nbsp;ms</b><span>camera and projector delay (webcam; phone 165&nbsp;ms; it differs from one calibration to the next). The engine's own step takes 51&nbsp;ms median (phone 41&nbsp;ms).</span></li>
     <li class="stat" style="--c: var(--sky)"><b>5.3° → 0.11°</b><span>edge tilt of the picture before and after automatic keystone correction (webcam).</span></li>
   </ul>
 
@@ -313,7 +313,7 @@
     <h3>Where it struggles</h3>
     <ul>
       <li><b>Busy content.</b> Photos and cluttered desktops cause false detections. Plain backgrounds, slides, drawings and games work best.</li>
-      <li><b>Dark content.</b> A hand over pure black is invisible to this method: there is no projected light to take away.</li>
+      <li><b>Dark content.</b> A hand over anything dark is invisible to this method: there is no projected light to take away. The apps use bright colours near the fingertip for this reason.</li>
       <li><b>Dense text</b> breaks up the hand's outline; on the live rig the dense text page gave the worst results of all pictures.</li>
       <li><b>Delay.</b> The camera and projector add a noticeable lag; the pointer predicts a little ahead to hide part of it.</li>
       <li><b>One camera position.</b> Moving the camera or projector needs a new calibration, which VisionTouch tries to do by itself.</li>

@@ -46,29 +46,39 @@ class Engine:
         self.sensitivity = 1.0  # user knob: scales the detection thresholds
         self._covered_since = self._last_frame = time.monotonic()
         self._drift = 0  # consecutive checks in which the picture looked shifted
+        self._next_try = 0.0  # earliest time for the next automatic calibration
         self.keystone, self.warp = True, np.eye(3)  # warp: content box pixels -> screen pixels
         self._frame_number, self._frame_time, self._count = 0, 0.0, 0
+        self.source = None
+        self.server.on_close = self.close
         self._open_camera(camera)
 
     # --- setup ---
 
     def _open_camera(self, source):
-        if getattr(self, "camera", None):
-            self.camera.close()
+        """Switch to a camera. Raises RuntimeError, changing nothing, if it cannot be opened."""
         # `source` is normally a string for Camera; tests pass a ready-made camera object.
-        self.source = getattr(source, "name", str(source))
-        self.camera = source if hasattr(source, "read") else Camera(source)
+        name = getattr(source, "name", str(source))
+        old = getattr(self, "camera", None)
+        if old is not None and name == self.source:  # reopening the same device: it must be let go first
+            old.close()
+            old = None
+        camera = source if hasattr(source, "read") else Camera(source)
+        if old is not None:
+            old.close()
+        self.source, self.camera = name, camera
         self._frame_number, self.predictor = 0, None
-        saved = STORE / f"calibration_{re.sub(r'[^A-Za-z0-9]', '_', self.source)}.npz"
-        self._saved = saved
+        self._saved = STORE / f"calibration_{re.sub(r'[^A-Za-z0-9]', '_', name)}.npz"
         frame, _, _ = self.camera.read(timeout=10)
-        if saved.exists() and frame is not None:
-            data = np.load(saved)
-            if "warp" in data and tuple(data["screen"]) == self.screen.size and tuple(data["camera"]) == frame.shape[1::-1]:
-                self.predictor = Predictor(data["H"], self.screen.size, frame.shape[1::-1])
-                self.predictor.colour_map = data["colour_map"]
-                self.latency, self.warp = float(data["latency"]), data["warp"]
+        try:  # a calibration saved earlier, if it is readable and fits this screen and camera
+            data = np.load(self._saved)
+            if frame is not None and tuple(data["screen"]) == self.screen.size and tuple(data["camera"]) == frame.shape[1::-1]:
+                predictor = Predictor(data["H"], self.screen.size, frame.shape[1::-1])
+                predictor.colour_map = data["colour_map"]
+                self.latency, self.warp, self.predictor = float(data["latency"]), data["warp"], predictor
                 self._send_warp()
+        except (OSError, KeyError, ValueError):
+            pass
 
     def _say(self, message):
         self.message = message
@@ -108,12 +118,26 @@ class Engine:
     def _fresh_frame(self, wait):
         """A camera frame taken after waiting `wait` seconds (lets a new pattern arrive)."""
         time.sleep(wait)
-        frame, _, self._frame_number = self.camera.read(newer_than=self._frame_number)
-        frame, _, self._frame_number = self.camera.read(newer_than=self._frame_number)
+        for _ in range(2):
+            frame, _, number = self.camera.read(newer_than=self._frame_number)
+            if frame is None:
+                raise RuntimeError("the camera stopped sending pictures")
+            self._frame_number = number
         return frame
 
     def calibrate(self):
-        """Project the calibration patterns and build the predictor. About 10 seconds."""
+        """Project the calibration patterns and build the predictor. About 10
+        seconds. Returns True on success; on failure the reason is in `message`."""
+        if self.mode != "apps":
+            return self._say("Calibration failed: switch to Apps first, the picture must fill the screen")
+        try:
+            return self._calibrate()
+        except (RuntimeError, ValueError, np.linalg.LinAlgError) as problem:
+            return self._say(f"Calibration failed: {problem}")
+        finally:
+            self.server.show(None)  # never leave a pattern on the wall
+
+    def _calibrate(self):
         w, h = self.screen.size
         pattern, corners = marker_pattern(w, h)
         self._say("Calibrating: finding the screen")
@@ -122,11 +146,10 @@ class Engine:
         best, frame = None, self._fresh_frame(1.2)
         for _ in range(4):  # the sharpest of a few frames
             H, error, count = find_homography(frame, corners)
-            if H is not None and (best is None or error < best[1]):
+            if H is not None and count >= 12 and (best is None or error < best[1]):
                 best = (H, error, count)
             frame = self._fresh_frame(0)
-        if best is None or best[2] < 12 or best[1] > 6:
-            self.server.show(None)
+        if best is None or best[1] > 6:
             return self._say("Calibration failed: the camera must see the whole projected picture")
         predictor = Predictor(best[0], (w, h), frame.shape[1::-1])
         self._say("Calibrating: learning colours")
@@ -143,11 +166,12 @@ class Engine:
         quad = cv2.perspectiveTransform(np.float32([[[0, 0], [w, 0], [w, h], [0, h]]]), np.linalg.inv(best[0]))[0]
         screen_frame = find_frame(self._fresh_frame(0.5), quad)
         self.warp = correction(best[0], (w, h), frame.shape[1::-1], screen_frame)
-        self.server.show(None)
         self.predictor = predictor
         STORE.mkdir(parents=True, exist_ok=True)
         np.savez(self._saved, H=best[0], colour_map=predictor.colour_map, latency=self.latency,
                  screen=self.screen.size, camera=frame.shape[1::-1], warp=self.warp)
+        if self._recording:  # a recording needs the calibration it was made with
+            (self._recording[0] / self._saved.name).write_bytes(self._saved.read_bytes())
         self._send_warp()
         straight = "squared to the screen frame" if screen_frame is not None else "squared to the camera's view"
         self._say(f"Calibrated: {best[2]} markers, {best[1]:.1f} px error, {self.latency * 1000:.0f} ms delay, {straight}")
@@ -200,11 +224,11 @@ class Engine:
     def step(self):
         frame, when, number = self.camera.read(newer_than=self._frame_number, timeout=1.0)
         if frame is not None:
-            self._last_frame = time.monotonic()
+            self._last_frame, self._frame_number, self._frame_time = time.monotonic(), number, when
         if frame is None or self.predictor is None:
+            self._drive_mouse([])  # nothing seen: never keep the mouse button held
             time.sleep(0.02)
             return None
-        self._frame_number, self._frame_time = number, when
         screen, others = self.screen.at(when - self.latency)
         if screen is None:
             return None
@@ -219,7 +243,7 @@ class Engine:
             self._covered_since = when
         # A small knock shows up as a sideways shift between the predicted and
         # the observed picture; phase correlation measures it (once a second).
-        if self._count % 30 == 0:
+        if self._count % 30 == 0 and not others:  # only while the screen is still
             grey = [cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) for image in (predicted, observed)]
             (dx, dy), confidence = cv2.phaseCorrelate(grey[0], grey[1], cv2.createHanningWindow(p.size, cv2.CV_32F))
             self._drift = self._drift + 1 if confidence > 0.25 and np.hypot(dx, dy) > 2.5 else 0
@@ -273,27 +297,38 @@ class Engine:
         self.server.debug("overlay", overlay)
 
     def _drive_mouse(self, pointers):
+        """Move the OS mouse with the first hand (desktop mode). Called with no
+        pointers it only lets go of the button, which is safe in any mode."""
         if self.mouse is None:
+            if not pointers:
+                return
             import pyautogui
 
             pyautogui.PAUSE, pyautogui.FAILSAFE = 0, False
-            self.mouse, self._mouse_down = pyautogui, False
-        if not pointers:
-            if self._mouse_down:
-                self.mouse.mouseUp()
-                self._mouse_down = False
+            self.mouse, self._mouse_down, self._mouse_hand = pyautogui, False, None
+        first = pointers[0] if pointers else None
+        # Let go when the hand is gone, and before another hand takes over the mouse.
+        if self._mouse_down and (first is None or first["id"] != self._mouse_hand or not first["down"]):
+            self.mouse.mouseUp()
+            self._mouse_down = False
+        if first is None:
             return
-        first = pointers[0]
         x, y = self._to_screen(first)
         self.mouse.moveTo(self.screen.origin[0] + x, self.screen.origin[1] + y)
-        if first["down"] != self._mouse_down:
-            (self.mouse.mouseDown if first["down"] else self.mouse.mouseUp)()
-            self._mouse_down = first["down"]
+        if first["down"] and not self._mouse_down:
+            self.mouse.mouseDown()
+            self._mouse_down, self._mouse_hand = True, first["id"]
+
+    def close(self):
+        """Called when the window closes: let go of the mouse and the camera."""
+        self._drive_mouse([])
+        self.camera.close()
 
     def _set_mode(self, mode):
         """apps: the stage is fullscreen and receives the pointers. desktop: the
         stage shrinks to a small strip that stays on top (it holds the button
         to come back) and the pointers drive the OS mouse."""
+        self._drive_mouse([])
         self.mode = mode
         view = getattr(self.server, "view", None)  # the built-in window, absent in browser mode
         if view is not None:
@@ -307,8 +342,11 @@ class Engine:
                 time.sleep(0.1)
             time.sleep(0.7)
             if mode == "desktop":
-                view.resize(*STRIP)
-                time.sleep(0.5)
+                for _ in range(10):  # a resize asked for too early is ignored: check, and ask again
+                    view.resize(*STRIP)
+                    time.sleep(1.0)
+                    if self.server.window and self.server.window[0] < 2 * STRIP[0]:
+                        break
                 view.move(self.screen.origin[0] + (self.screen.size[0] - STRIP[0]) // 2, self.screen.origin[1] + 40)
                 view.on_top = True
         self._send_warp()
@@ -353,13 +391,14 @@ class Engine:
             frames += self.step() is not None
             # Look after itself: calibrate on first use, recalibrate after a bump,
             # reopen a camera that stopped sending pictures.
-            if self.mode == "apps" and self.server.window and now - self._last_frame < 1:
-                if self.predictor is None and not self.message.startswith("Calibration failed"):
-                    self.calibrate()
-                elif self.predictor is not None and (self._drift >= 3 or self._frame_time - self._covered_since > 4):
+            if self.mode == "apps" and self.server.window and now - self._last_frame < 1 and now > self._next_try:
+                moved = self.predictor is not None and (self._drift >= 3 or self._frame_time - self._covered_since > 4)
+                if moved:
                     self._say("The camera or projector has moved: recalibrating")
+                if moved or self.predictor is None:
                     self.calibrate()
                     self._drift, self._covered_since = 0, self._frame_time
+                    self._next_try = time.monotonic() + 20  # if that failed, do not flash patterns in a loop
             if now - self._last_frame > 4:
                 self._say("The camera stopped sending pictures: reconnecting")
                 try:

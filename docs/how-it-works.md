@@ -28,17 +28,17 @@ Each stage below says what it does, why it is needed, which lecture it belongs t
 ```mermaid
 flowchart LR
     A[Camera frame] --> D
-    S[Screenshot] --> W[Warp to camera view<br/>homography]
+    S[Screenshots around<br/>the right moment] --> W[Warp to camera view<br/>homography]
     W --> P[Predict camera colours<br/>colour map, exposure, banding]
     P --> D[Compare: residual]
-    D --> T[Threshold + morphology<br/>connected components]
-    T --> F[Fingertip:<br/>farthest point from the edge]
+    D --> T[Threshold + morphology<br/>group pieces, thickness test]
+    T --> F[Fingertip:<br/>farthest solid point from the edge]
     F --> M[MediaPipe on a crop:<br/>point, pinch, palm, fist]
     M --> K[Kalman tracking<br/>dwell, pinch, swipe]
     K --> O[Touch events in the apps<br/>or the OS mouse]
 ```
 
-Calibration (stages 2 and 3) takes about ten seconds. It runs on first use, when the user presses "Calibrate", and by itself when the engine sees that the camera or projector has moved (most of the picture disagrees with the prediction for several seconds, or phase correlation between the predicted and observed images shows a steady shift). Everything else runs on every camera frame.
+Calibration (stages 2, 3 and 9, plus the delay measurement) takes about ten seconds. It runs by itself on first start, when the user presses "Calibrate", and when the engine sees that the camera or projector has moved: either most of the picture disagrees with the prediction for more than 4 seconds, or phase correlation (a way to measure a sideways shift between two images), checked once a second while the screen is not changing, shows the predicted and observed images shifted by more than 2.5 working pixels three times in a row. After an automatic try the engine waits 20 seconds before the next, so a failure does not flash patterns in a loop. Calibration needs Apps mode, because the picture must fill the screen. The engine also reopens a camera that has sent no picture for 4 seconds. Everything else runs on every camera frame.
 
 ![The pipeline on a slide with a synthetic hand](figures/pipeline_good.png)
 
@@ -127,13 +127,13 @@ The screenshot is warped into the camera's view with the homography (`cv2.warpPe
 
 ### 4e. When the screen itself is changing
 
-**What it does.** Games move, buttons light up, and the app draws a cursor ring that follows your finger. The camera frame is about 0.2 s old, and that delay wanders by a few frames, so we cannot know exactly which screen picture the camera saw. The engine therefore takes every screenshot from 0.15 s before to 0.15 s after the expected moment. Where they differ, the allowed range for a pixel stretches from the darkest to the brightest value any of them predicts (`others` in `Predictor.residual`). A pixel inside that range is fine. A hand is usually outside it, so it is still found.
+**What it does.** Games move, buttons light up, and the app draws a cursor ring that follows your finger. The camera frame is about 0.2 s old, and that delay wanders by a few frames, so we cannot know exactly which screen picture the camera saw. `Screen.at` therefore returns the best-matching screenshot plus every other one shown within 0.15 s before or after the expected moment. Where they differ from the best one, the allowed range for a pixel stretches from the darkest to the brightest value any of them predicts (`others` in `Predictor.residual`). A pixel inside that range is fine. A hand is usually outside it, so it is still found. Changing areas are also left out when the exposure and banding corrections are fitted.
 
-**Why.** Our first version simply ignored changed pixels. That blinded the engine exactly at the fingertip, because the cursor ring changes there all the time: in a simulated test the pointer wobbled by 70 px and never clicked. Our second version compared against only the two nearest screenshots, which broke as soon as the simulation was given a realistic 0.2 s display delay.
+**Why.** Changing pixels cannot be ignored: that would blind the engine exactly at the fingertip, where the cursor ring changes all the time. Comparing against only the two nearest screenshots is not enough either: with a realistic 0.2 s display delay the camera may have seen an older one.
 
-**A rule for the apps that follows from the physics.** A finger is invisible to the camera wherever the projector shows something dark, because it receives no light there. So nothing dark may be drawn at the fingertip: the cursor ring is bright (a dark outline cut the fingertip off from the hand), and the Board draws in blue by default (with black ink the pen trailed about 40 px behind the finger in simulation). Both cases are regression tests in `tests/test_simulated_rig.py`.
+**A rule for the apps that follows from the physics.** A finger is invisible to the camera wherever the projector shows something dark, because it receives no light there. So nothing dark may be drawn where a hand is likely to be. The cursor ring is bright with no dark outline (a dark outline cut the fingertip off from the hand). The Board draws in blue by default (black ink hides the finger behind the pen). Moving game sprites are outlined in a darker shade of their own colour, not in ink. Large fills are light tints. `tests/test_simulated_rig.py` has four tests: calibrate and find a fingertip; reach over the launcher's dark outlines; the app's own feedback (ring and ink) must not disturb the pointer; sprites drifting behind a still hand must not move it. The simulation shows the picture 0.2 s late, like the real rig.
 
-**Lecture.** Image subtraction, done against more than one reference image, with a pixel-wise minimum (image arithmetic).
+**Lecture.** Image subtraction, done against more than one reference image, with a pixel-wise minimum and maximum (image arithmetic).
 
 ### Why each step is there: the ablation ("alternative methods")
 
@@ -159,10 +159,10 @@ How to read it: the colour map alone does not help, because the camera's exposur
 
 1. **Hysteresis threshold.** Pixels with residual above `LOW = 8` are weak evidence. A blob is only kept if at least 20 % of its pixels are above `HIGH = 18` (strong evidence).
 2. **Morphology.** An opening (3×3) removes single noisy pixels and thin lines left at edges. A closing (7×7) fills small holes inside the hand.
-3. **Connected components.** Every separate blob gets a label. Blobs smaller than 0.15 % of the image are dropped.
-4. **Thickness test.** A blob must be at least 7 pixels wide somewhere (`THICK`), tested with an erosion. An arm is wide; the leftovers along the coloured outlines of buttons are thin strips, and this removes them.
-5. **Grouping.** Pieces closer than 17 pixels (`GAP`) count as one blob, and a blob is kept if it contains at least one piece that passed the tests above. Where the picture is dark, a hand or shadow leaves no trace, so an arm reaching across the dark outline of a button is cut in two; grouping puts it back together.
-6. Thin parts attached to a kept blob (a finger the opening removed) are grown back, up to 12 pixels.
+3. **Connected components.** Every separate piece gets a label. Pieces smaller than 0.15 % of the image are not real.
+4. **Thickness test.** A piece must be at least 7 pixels wide somewhere (`THICK`), tested with an erosion. An arm is wide; the leftovers along the outlines of buttons are thin strips, and this removes them.
+5. **Grouping.** Pieces closer than 17 pixels (`GAP`) count as one blob, and a blob is kept if it contains at least one real piece (strong, big enough and wide enough). Where the picture is dark, a hand leaves no trace, so an arm reaching across the dark outline of a button is cut in two; grouping puts it back together. A lone small piece is still dropped.
+6. Thin parts attached to a kept blob (a finger the opening removed) are grown back, up to 12 pixels. A final 5×5 dilation gives back the margin that the residual's tolerance ate.
 
 **Why.** A single threshold forces a bad choice: low enough to catch a faint hand also catches noise; high enough to ignore noise also cuts off the faint fingertip. Hysteresis uses the high threshold to decide *whether* a blob is real and the low one to decide *how big* it is.
 
@@ -185,7 +185,7 @@ How to read it: the colour map alone does not help, because the camera's exposur
 
 ## 6. Fingertip
 
-**What it does** (`find_tips` in `hands.py`). An arm always enters the picture from an edge. So a blob counts as a hand only if at least 5 of its pixels lie in a thin band, about 4 working pixels wide, along the edge of the projected area (the area minus its 9×9 erosion). The entry point is the mean of the blob's pixels in that band. The fingertip is the mean of the 1 % of blob pixels farthest from the entry point.
+**What it does** (`find_tips` in `hands.py`). An arm always enters the picture from an edge. So a blob counts as a hand only if at least 5 of its pixels lie in a thin band, about 4 working pixels wide, along the edge of the projected area (the area minus its 9×9 erosion). The entry point is the mean of the blob's pixels in that band. The fingertip is the mean of the 1 % of solid blob pixels (at least 3) farthest from the entry point. "Solid" is explained below.
 
 **Why.** It is simple, fast, and works for any hand shape that points away from the body. Islands in the middle of the screen (a flicker, a reflection) are ignored.
 
@@ -202,11 +202,11 @@ How to read it: the colour map alone does not help, because the camera's exposur
 | Phone | 138 | 89 % | 10.1 | 0.52 % | 682 | 67 % |
 <!-- END fingertip -->
 
-**Two guards on the fingertip.** It is looked for only on parts of the blob at least 5 pixels wide (`SOLID`), and no further than 26 pixels (`FINGER`) from the hand's wide body. A thin leftover along a button's outline can touch the hand; without these guards it would drag the fingertip along the outline.
+**Two guards on the fingertip.** It is looked for only on solid parts of the blob, at least 5 pixels wide (`SOLID`, found with an opening), and no further than 26 pixels (`FINGER`) from the hand's wide body (the parts at least 9 pixels wide, `PALM`). A thin leftover along a button's outline or the app's cursor ring can touch the hand; without these guards it would drag the fingertip along that line.
 
 ## 7. Hand pose with MediaPipe
 
-**What it does.** MediaPipe Hands is a neural network from Google that finds 21 points (landmarks) on a hand. We do not run it on the whole frame. We cut a square around the fingertip, moved a little towards the arm, about a quarter of the picture's width across, enlarge it to 320×320, and run MediaPipe on that crop (`Landmarker` in `hands.py`). Simple rules on the landmarks give the pose: thumb tip near index tip = **pinch**, all four fingers stretched = **palm**, none stretched = **fist**, otherwise **point**.
+**What it does.** MediaPipe Hands is a neural network from Google that finds 21 points (landmarks) on a hand. We do not run it on the whole frame. We cut a square around the fingertip, moved a little towards the arm, about a quarter of the picture's width across, enlarge it to 320×320, and run MediaPipe on that crop (`Landmarker` in `hands.py`). Where the square sticks out of the camera frame, the edge pixels are repeated, so the crop stays square and the hand is not stretched. We believe the landmarks only if one of them lies within 0.3 × the crop's half-width of the blob's fingertip: the hand they describe must end where the blob ends, or the model has imagined a hand on the background. Simple rules on the landmarks give the pose: thumb tip near index tip = **pinch**, all four fingers stretched = **palm**, none stretched = **fist**, otherwise **point**.
 
 **Why.** The classical pipeline finds *where* something is, but not *what* the hand is doing. Pinch is our click; an open palm is the eraser.
 
@@ -231,11 +231,12 @@ Time per call on this laptop (median): Webcam: whole frame 13 ms, crop 13 ms; Ph
 
 ## 8. Tracking, clicks and swipes
 
-**What it does** (`track.py`). Each hand gets a Kalman filter that tracks its position and speed. Each new fingertip measurement is blended with the filter's prediction, so jitter is smoothed. The filter also predicts 60 ms ahead (`LEAD`) to hide part of the camera delay. A new pointer is reported only after 3 detections in a row (`CONFIRM`), which removes one-frame flickers.
+**What it does** (`track.py`). Each hand gets a Kalman filter that tracks its position and speed. Each new fingertip measurement is blended with the filter's prediction, so jitter is smoothed. The filter also predicts 60 ms ahead (`LEAD`) to hide part of the camera delay. A new pointer is reported only after 3 detections in a row (`CONFIRM`), which removes one-frame flickers. A pointer is dropped after 0.3 s without a detection. A pose (point, pinch, ...) must be seen in 2 frames in a row before it replaces the old one, because landmark poses flicker.
 
 - **Click by dwell**: hold the pointing finger still (within 2.5 % of the screen width) for 0.8 s.
 - **Click by pinch**: the pinch pose holds the button down.
-- **Hold mode** (protocol command `dwell` set to `hold`): the first hold presses and stays pressed while the finger moves, the next hold releases. This lets you draw without pinching. The Board switches it on while the hand is over the drawing area and back to ordinary taps over its toolbar.
+- **Hold mode** (protocol command `dwell` set to `hold`): the first hold presses and stays pressed while the finger moves, the next hold releases. This lets you draw without pinching. The Board asks for it while the hand is over the drawing area and goes back to ordinary taps over its toolbar and when it closes.
+- **Home and balloons need no press.** In the apps, a hand that points at the home button for one second goes home, and a hand that touches a balloon pops it. A dwell tap is too short to count as a one-second hold, and not every hand can pinch.
 - **Swipe**: move 30 % of the screen width sideways within 0.5 s (used by the Slides app).
 
 **Lecture.** Beyond the lectures (the Kalman filter is a state estimator from control theory).
@@ -265,7 +266,7 @@ Pointer error inside the corrected picture (synthetic shadow): median 3.1 px ove
 
 ## 10. Output
 
-The engine sends pointer positions about 30 times a second to the web front end, which turns them into ordinary browser pointer events, so every app works with a mouse too (`docs/protocol.md`). In desktop mode the engine moves the operating system's mouse instead.
+The engine sends pointer positions about 30 times a second to the web front end, which turns them into ordinary browser pointer events, so every app works with a mouse too (`docs/protocol.md`). In desktop mode the engine moves the operating system's mouse instead, and the stage window shrinks to a small strip that stays on top, with one button to go back.
 
 ---
 

@@ -22,6 +22,8 @@ def run(main, port=8765, fullscreen=True):
             window.destroy()
 
     webview.start(body)
+    if getattr(server, "on_close", None):  # set by the engine: let go of the mouse and the camera
+        server.on_close()
     # Leave without the interpreter's shutdown sequence: the window toolkit's
     # background threads can call back into Python while it is being torn
     # down, which crashes the process on exit.

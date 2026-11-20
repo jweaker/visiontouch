@@ -29,7 +29,11 @@ class Screen:
         with mss.MSS() as grabber:
             box = grabber.monitors[self.monitor]
             while self._running:
-                shot = np.asarray(grabber.grab(box))[..., :3]
+                try:
+                    shot = np.asarray(grabber.grab(box))[..., :3]
+                except Exception:  # a failed grab (display asleep, permission dialog): try again
+                    time.sleep(0.2)
+                    continue
                 now = time.monotonic()
                 small = cv2.resize(shot, None, fx=SCREEN_SCALE, fy=SCREEN_SCALE, interpolation=cv2.INTER_AREA)
                 with self._lock:

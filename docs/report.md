@@ -86,10 +86,10 @@ flowchart TB
     end
     subgraph Frame [Every camera frame]
         F1[Camera frame] --> F5
-        F2[Screenshot from the matching moment] --> F3[Warp to camera view] --> F4[Predict colours:<br/>colour map, exposure, row banding, shading]
-        F4 --> F5[Residual against local min..max]
-        F5 --> F6[Hysteresis threshold, opening, closing,<br/>connected components]
-        F6 --> F7[Fingertip: farthest point<br/>from where the arm enters]
+        F2[Screenshots from around<br/>the matching moment] --> F3[Warp to camera view] --> F4[Predict colours:<br/>colour map, exposure, row banding, shading]
+        F4 --> F5[Residual against local min..max<br/>of all those screenshots]
+        F5 --> F6[Hysteresis threshold, opening, closing,<br/>thickness test, grouping of nearby pieces]
+        F6 --> F7[Fingertip: farthest solid point<br/>from where the arm enters]
         F7 --> F8[MediaPipe on a crop: pose]
         F8 --> F9[Kalman tracker:<br/>dwell click, pinch, swipe]
         F9 --> F10[Pointer events or OS mouse]
@@ -136,9 +136,13 @@ The colour map is a cubic polynomial (20 terms per camera channel) fitted on the
 
 ### 3.5 Thresholds and morphology
 
-Hysteresis thresholds `LOW = 8` and `HIGH = 18` grey levels; opening 3×3, closing 7×7; blobs below 0.15 % of the image dropped; a blob must touch the edge of the picture to count as an arm.
+Hysteresis thresholds `LOW = 8` and `HIGH = 18` grey levels; opening 3×3, closing 7×7; pieces below 0.15 % of the image dropped; a piece must be at least 7 pixels wide somewhere (`THICK`), which removes thin leftovers along button outlines. Pieces closer than 17 pixels (`GAP`) form one blob, and a blob is kept if it contains one real piece, so an arm cut in two by a dark outline stays one arm. A blob must touch the edge of the picture to count as an arm. The fingertip is searched only on solid parts of the blob (at least 5 pixels wide, `SOLID`) within 26 pixels (`FINGER`) of the hand's wide body (`PALM`, 9 pixels). A user setting, sensitivity (0.4 to 2.5), scales both thresholds; the tests use 1.
 
-### 3.6 Keystone correction
+### 3.6 When the screen changes
+
+The camera frame is about 0.2 s old, and that delay varies by a few frames. So the residual is taken against the range of every screenshot shown within 0.15 s of the expected moment, not just one. This lets games, animations and the cursor ring change the picture without blinding the engine ([`how-it-works.md`](how-it-works.md), section 4e).
+
+### 3.7 Keystone correction
 
 ![Keystone](figures/keystone.png)
 
@@ -279,7 +283,7 @@ The offline counts are per single frame, before the tracker's three-frame confir
 **Failure cases.**
 
 - **Photos and the desktop screenshot** are the hardest class. The residual is high over all fine texture, not just on the hand (panel 4 above), so clean frames get false blobs; when one joins the hand's blob, the fingertip lands far away.
-- **Black and dark content.** A shadow on black removes no light, so the hand is invisible on `black` for both cameras. Dark slides also produce false blobs.
+- **Black and dark content.** A shadow on black removes no light, so the hand is invisible on `black` for both cameras. Dark slides also produce false blobs. For the same reason the apps avoid dark colours near the fingertip: the cursor ring is bright, the Board draws in blue, game sprites are outlined in a darker shade of their own colour, and large fills are light tints.
 - **Text.** Black text inside the hand stays black, so the hand's blob has holes along each line of text. On the live rig the dense text page gave the worst results of all pictures (table in 4.4).
 
 ### 4.4 Live rig
@@ -401,6 +405,7 @@ MediaPipe almost never fires on the synthetic hands, which is expected: they are
 **Weaknesses.**
 
 - Photos, busy desktops and dark content give false blobs and wrong fingertips.
+- Windows and Linux builds have not been run on real hardware (only a headless self-check in CI).
 - No true touch sensing: one camera cannot measure depth, so clicks use dwell or pinch.
 - The camera and projector delay is large compared with what users notice on direct touch [51][53].
 - Not yet tested with real hands.
@@ -425,4 +430,4 @@ uv run python -m eval.figures          # writes runs/figures/*.png and docs/figu
 uv run python -m eval.fill_report      # refreshes the tables in this report
 ```
 
-The rig tests (`eval/live_test.py`, `eval/idle_test.py`, `eval/keystone_test.py`) need the projector and camera and open a full-screen window.
+The rig tests (`eval/live_test.py`, `eval/idle_test.py`, `eval/keystone_test.py`, and also `eval/soak_test.py` and `eval/stage_test.py`) need the projector and camera and open a full-screen window. `uv run python tests/test_simulated_rig.py` needs no hardware: it runs the whole engine against a simulated projector and camera with a 0.2 s display delay (four tests).

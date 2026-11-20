@@ -91,7 +91,8 @@ def main(server):
 
     # Desktop mode: the window shrinks to a strip whose button brings the stage back.
     engine._handle({"t": "cmd", "name": "mode", "value": "desktop"})
-    time.sleep(1.5)
+    time.sleep(1.0)
+    print("window in desktop mode:", server.window, flush=True)
     results["desktop mode shrinks the window"] = server.window[0] < 600 and server.window[1] < 200
     label = js("document.body.innerText")
     results["strip shows the way back"] = "Back to VisionTouch" in (label or "")

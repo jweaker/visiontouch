@@ -124,15 +124,16 @@ def build():
 
     # 5. Pipeline
     s = slide(deck, "The pipeline, and which lecture each step uses", kicker="Phase 2 · Design",
-              notes="Walk through the steps left to right, one sentence each. Calibration happens once; everything else every frame. "
+              notes="Walk through the steps left to right, one sentence each. Calibration happens on first start and again by itself if the camera or projector is knocked; everything else runs every frame. "
+                    "The delay between screen and camera is only known roughly, so the engine compares with every screenshot shown within 0.15 s of the expected moment. "
                     "Lecture links: colour images and resolution (capture), point processing and intensity transformations (colour map, exposure), image subtraction (residual), "
                     "spatial filtering (local min and max), thresholding and binary images (mask), power-law gamma and smoothing (keystone). "
                     "Beyond the lectures: homography, polynomial regression, Kalman filter, MediaPipe.")
     steps = [("Calibrate", "markers → homography\ncolour tiles → colour map", "beyond: homography,\nregression"),
              ("Predict", "warp screenshot,\nexposure, banding", "point processing,\nintensity transforms"),
-             ("Subtract", "residual against local\nmin..max", "image subtraction,\nspatial filtering"),
-             ("Mask", "hysteresis threshold,\nopening, closing", "thresholding,\nbinary images"),
-             ("Fingertip", "farthest point from\nwhere the arm enters", "binary image\ngeometry"),
+             ("Subtract", "residual against local\nmin..max of nearby\nscreenshots", "image subtraction,\nspatial filtering"),
+             ("Mask", "hysteresis threshold,\nopening, closing,\ngroup nearby pieces", "thresholding,\nbinary images"),
+             ("Fingertip", "farthest solid point\nfrom where the arm\nenters", "binary image\ngeometry"),
              ("Pose + track", "MediaPipe on a crop,\nKalman filter", "beyond: CNN,\nKalman")]
     for i, (name, what, lecture) in enumerate(steps):
         x = Inches(0.5 + i * 2.1)
@@ -188,7 +189,8 @@ def build():
     # 11. Failure case
     s = slide(deck, "Failure case: a detailed photo", kicker="Phase 4 · Failure cases",
               notes="On a photo with leaves and fine detail, the residual is high everywhere, not just on the hand. False blobs join the hand and the fingertip lands far away. "
-                    "Other failures: on black there is no light to block, so a shadow is invisible; dense text breaks the hand's blob into pieces.")
+                    "Other failures: on black there is no light to block, so a shadow is invisible; dense text breaks the hand's blob into pieces. "
+                    "The same physics shapes our apps: a hand is invisible over anything dark, so the cursor ring is bright, the Board draws in blue, and game sprites are outlined in a darker shade of their own colour.")
     picture(s, "pipeline_failure", x=Inches(0.9), y=Inches(1.5), h=Inches(5.9))
 
     # 12. Live rig and speed
@@ -221,6 +223,7 @@ def build():
     frames = sum(m[c]["hand_full"]["frames"] for c in m) if m else None
     s = slide(deck, "Honest limits, and what comes next", kicker="Conclusion",
               notes="Say this plainly. Every hand so far is synthetic. We have not measured real skin, real 3-D shadows, pinch on a real hand, or a body blocking the camera. "
+                    "The Windows and Linux builds have not been run on real hardware; only CI's headless self-check has passed. "
                     f"MediaPipe fired on {fired} of {frames} synthetic-hand frames on the whole image, which says nothing about real hands. "
                     "Real-hand accuracy: " + (f"median {real['median_error_px']:.0f} px over {real['taps']} taps." if real else "not yet measured; the Accuracy app logs every tap and the report fills in automatically.")
                     + " Next: real-hand test, touch from the shadow, separating hand from shadow by colour, and lower delay.")
@@ -229,7 +232,8 @@ def build():
         "Not yet measured: real skin, 3-D shadows, pinch, body blocking the camera.",
         "Real-hand accuracy: " + (f"median {real['median_error_px']:.0f} px" if real else "not yet measured."),
         "Photos, black areas and dense text fail.",
-        "No depth: a click is a pause or a pinch."], 22)
+        "No depth: a click is a pause or a pinch.",
+        "Windows and Linux builds: headless self-check only."], 22)
     text(s, Inches(7.0), Inches(1.8), Inches(5.8), Inches(5.4), [
         "Next steps",
         "Real-hand test with the Accuracy app",

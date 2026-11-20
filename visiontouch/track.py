@@ -57,6 +57,9 @@ class Tracker:
     def update(self, detections, now):
         """detections: list of {"pos": (x, y) in 0..1, "pose": str or None}.
         Returns (pointers for the protocol, list of gesture names)."""
+        # Forget hands not seen for a while first, so that a new hand never
+        # inherits the state (a held press) of one that has gone.
+        self.pointers = [p for p in self.pointers if now - p.seen < LOST_AFTER]
         free = list(self.pointers)
         for det in detections:
             position = np.asarray(det["pos"], float)
@@ -84,6 +87,8 @@ class Tracker:
             # Dwell click: holding the pointing finger still gives one short tap.
             if np.linalg.norm(position - p.anchor) > DWELL_RADIUS:
                 p.anchor, p.anchor_time, p.armed = position.copy(), now, True
+            elif p.pose != "point" or now - p.seen > 0.15:
+                p.anchor_time = now  # the wait counts only while a pointing finger is actually seen
             elif self.dwell and p.armed and p.pose == "point" and now - p.anchor_time > DWELL_TIME:
                 p.armed = False
                 if self.hold:

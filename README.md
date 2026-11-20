@@ -22,11 +22,12 @@ This opens the projected stage full-screen and starts the camera. Useful options
 |---|---|
 | `--camera 1` | Use another camera (the number the operating system gives it). |
 | `--camera android` | Use an Android phone's back camera over USB (see below). |
+| `--port 8766` | Port of the local stage server (default 8765). |
 | `--windowed` | Do not go full-screen. |
 | `--browser` | Show the stage in your web browser instead of the built-in window. |
 | `--no-landmarks` | Classical detection only, without MediaPipe (no pinch or palm). |
 | `--record FOLDER` | Save the session (camera frames and screen pictures) so it can be replayed offline with `python -m eval.replay FOLDER`. |
-| `--check` | Check the installation without opening a window or camera. |
+| `--check` | Check the installation without opening a window or camera. `--check-log FILE` writes the result to a file. |
 
 Ready-made desktop builds are described in [packaging/README.md](packaging/README.md).
 
@@ -34,10 +35,10 @@ Ready-made desktop builds are described in [packaging/README.md](packaging/READM
 
 1. Place the camera so it sees the **whole projected picture**, with a little margin around it. Below or beside the projector works. A steep angle works but lowers accuracy.
 2. Keep the camera **still**. If it moves, the engine notices and calibrates again by itself.
-3. Open **Settings** and press **Calibrate now**. The projector shows a grid of black-and-white markers, a few colour mosaics, and a black and a white flash. Stay out of the picture for about ten seconds. The engine also calibrates on first start and recalibrates by itself if the camera or projector is knocked.
+3. Open **Settings** and press **Calibrate now**. The projector shows a grid of black-and-white markers, a few colour mosaics, and a black and a white flash. Stay out of the picture for about ten seconds. Calibration needs Apps mode (not Desktop mode). The engine also calibrates on first start and recalibrates by itself if the camera or projector is knocked.
 4. The status line reports the number of markers found, the alignment error and the camera delay. If calibration fails, the camera probably cannot see the whole picture.
 
-Calibration also straightens the picture automatically (keystone correction) if the camera can see the edge of the projection screen. You can switch this off in Settings.
+Calibration also straightens the picture automatically (keystone correction). It squares the picture to the edge of the projection screen if the camera can see it, and to the camera's own view if not. You can switch this off in Settings. If the camera stops sending pictures, the engine reopens it.
 
 ## Using a phone as the camera
 
@@ -51,17 +52,17 @@ Put the phone on a stand: it must not move after calibration.
 
 | App | What it does |
 |---|---|
-| Board | Draw with your finger. Open your palm to erase. |
-| Balloons | Pop as many as you can. |
+| Board | Draw with your finger (blue by default). Open your palm to erase. |
+| Balloons | Touch balloons to pop as many as you can. |
 | Catch | Catch the stars, avoid the bombs. |
 | Slides | Present any PDF; swipe or tap the edges to change pages, draw on the page. |
 | Quiz | Questions on image processing basics. |
 | Memory | Find the six pairs. |
 | Accuracy | Tap 20 targets; measures how precisely touches land. |
 | Pipeline | Watch each processing step live. |
-| Settings | Calibrate, keystone, apps or desktop mode, camera. |
+| Settings | Calibrate, keystone, apps or desktop mode, detection sensitivity, camera. |
 
-**Desktop mode** (in Settings) moves the computer's real mouse instead, so you can use any program. A small strip with a "back to apps" button stays on top. To go home from any app, hold the home button for one second.
+**Desktop mode** (in Settings) moves the computer's real mouse instead, so you can use any program. The window shrinks to a small strip with a "back to apps" button that stays on top. To go home from any app, point at the home button in the top-right corner for one second. A hand does not need to press it; a mouse must keep pressing.
 
 ## Gestures
 
@@ -69,15 +70,19 @@ Put the phone on a stand: it must not move after calibration.
 |---|---|
 | Point with one finger | Move the pointer. |
 | Hold the finger still (about 0.8 s) | Click. |
-| In drawing apps: hold still, move, hold still again | Draw a stroke without pinching. |
+| On the Board: hold still, move, hold still again | Draw a stroke without pinching. |
 | Pinch thumb and index finger | Press (hold the pinch to drag). |
 | Open palm | Erase (Board). |
 | Fast sideways swipe | Next or previous slide. |
+| Point at a balloon | Pops it. No press needed. |
+| Point at the home button for 1 s | Go home. No press needed. |
 
 ## Limits
 
 - **Measured on synthetic hands only, so far.** Our tests paint a hand shape into the projected picture and film it through the real projector and camera. Real skin, real 3-D shadows, pinch on a real hand and a body blocking the camera have not been measured yet. The real-hand test with the Accuracy app is still to be done.
-- **Busy or dark content is hard.** Photos and cluttered desktops cause false detections; a hand over pure black is invisible to the camera method; dense text breaks the hand's outline. Plain backgrounds, slides, drawings and games work best.
+- **Busy or dark content is hard.** Photos and cluttered desktops cause false detections; dense text breaks the hand's outline. Plain backgrounds, slides, drawings and games work best.
+- **A hand is invisible over anything dark.** No light falls on it there, so the camera sees no change. The apps are drawn to suit this: the cursor ring is bright with no dark outline, the Board draws in blue, game sprites are outlined in a darker shade of their own colour, and large areas are light tints.
+- **Windows and Linux are untested on real hardware.** Their builds have only passed the automated headless self-check. The macOS build has been checked headlessly on Apple silicon. See [packaging/README.md](packaging/README.md).
 - **No true touch.** One camera cannot measure depth, so a click is a pause or a pinch, not contact with the wall.
 - **Delay.** The camera and projector add a noticeable delay; the pointer predicts a little ahead to hide part of it.
 - **One camera position.** The camera and projector must stay put. After a knock the engine notices within a few seconds and calibrates again by itself, which interrupts the picture for about ten seconds.
@@ -96,7 +101,9 @@ uv run python -m eval.fill_report    # refreshes the tables in docs/report.md an
 uv run python docs/slides/build.py   # the presentation, docs/slides/VisionTouch.pptx
 ```
 
-The rig tests (`python -m eval.live_test`, `eval.idle_test`, `eval.keystone_test`, `eval.capture_dataset`) project test pictures full-screen and need the projector and camera. After a session with the Accuracy app, `eval.fill_report` adds the real-hand numbers from `~/.visiontouch/log.jsonl`.
+The rig tests (`python -m eval.live_test`, `eval.idle_test`, `eval.soak_test`, `eval.keystone_test`, `eval.stage_test`, `eval.capture_dataset`) open a full-screen window and need the projector and camera. After a session with the Accuracy app, `eval.fill_report` adds the real-hand numbers from `~/.visiontouch/log.jsonl`.
+
+The tests in `tests/` need no hardware. `uv run python tests/test_simulated_rig.py` runs the whole engine against a simulated projector and camera (with a 0.2 s display delay) and checks four cases: calibrate and find a fingertip, reaching over the launcher, the app's own feedback (cursor ring and ink), and sprites drifting behind the hand. `cd web && pnpm test` runs the stage's unit tests.
 
 ## Project layout
 
@@ -104,7 +111,8 @@ The rig tests (`python -m eval.live_test`, `eval.idle_test`, `eval.keystone_test
 |---|---|
 | `visiontouch/` | The engine (Python, OpenCV, NumPy, MediaPipe): camera, calibration, prediction, hand finding, tracking. |
 | `web/` | The projected stage and apps (TypeScript). See [web/README.md](web/README.md). |
-| `eval/` | Dataset capture, rig tests, offline experiments, figures. |
+| `eval/` | Dataset capture, rig tests, session replay, offline experiments, figures. |
+| `tests/` | Engine tests against a simulated projector and camera. |
 | `docs/` | How it works, report, related work, engine protocol, slides. |
 
 ## Licence

@@ -86,9 +86,9 @@ def _inside(points, polygon):
 
 
 def largest_rectangle(polygon, aspect):
-    """Largest axis-aligned rectangle of the given width/height ratio inside a
-    convex quadrilateral. Returns (x, y, width, height). Brute force over
-    centres, bisection on size: small and plenty fast."""
+    """The largest axis-aligned rectangle of the given width/height ratio inside
+    a convex quadrilateral, to within the search grid (41 x 41 centres, bisection
+    on size: small and plenty fast). Returns (x, y, width, height)."""
     lo, hi = polygon.min(0), polygon.max(0)
     best = (0.0, 0.0, 0.0, 0.0)
     for cx in np.linspace(lo[0], hi[0], 41):

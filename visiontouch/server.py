@@ -52,11 +52,13 @@ class Server:
         self._debug = {}  # stage name -> newest JPEG bytes
         self.viewers = 0  # open debug streams; the engine skips debug images when nobody watches
         self._loop = asyncio.new_event_loop()
-        self._ready = threading.Event()
+        self._ready, self._failed = threading.Event(), None
 
     def start(self):
         threading.Thread(target=self._run, daemon=True).start()
         self._ready.wait()
+        if self._failed:
+            raise RuntimeError(f"cannot serve on port {self.port}: {self._failed}")
 
     def _run(self):
         asyncio.set_event_loop(self._loop)
@@ -73,10 +75,14 @@ class Server:
         else:
             app.add_routes([web.get("/", lambda r: web.Response(text=FALLBACK_PAGE, content_type="text/html"))])
         runner = web.AppRunner(app)
-        self._loop.run_until_complete(runner.setup())
-        self._loop.run_until_complete(web.TCPSite(runner, "127.0.0.1", self.port).start())
+        try:
+            self._loop.run_until_complete(runner.setup())
+            self._loop.run_until_complete(web.TCPSite(runner, "127.0.0.1", self.port).start())
+        except OSError as problem:  # usually: the port is taken (is VisionTouch already running?)
+            self._failed = problem
         self._ready.set()
-        self._loop.run_forever()
+        if not self._failed:
+            self._loop.run_forever()
 
     # --- called from the engine thread ---
 
@@ -94,7 +100,7 @@ class Server:
         self._pattern = (number, png)
         self._shown.clear()
         self.send({"t": "pattern", "id": number, "url": png and f"/pattern/{number}.png"})
-        return self._shown.wait(timeout)
+        return png is None or self._shown.wait(timeout)  # removing a pattern needs no answer
 
     def debug(self, name, image):
         """Publish a pipeline stage image for the debug view."""
@@ -126,6 +132,8 @@ class Server:
                 self.inbox.put(m)
         finally:
             self._clients.discard(ws)
+            if not self._clients:
+                self.window = None  # no stage: nothing can be shown until one says hello again
         return ws
 
     async def _get_pattern(self, request):

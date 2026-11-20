@@ -105,6 +105,8 @@ class Predictor:
             keep = (flat & self.inside & (observed.max(2) < 250))[::2, ::2].ravel()
             xs.append(_features(warped[::2, ::2].reshape(-1, 3)[keep]))
             ys.append(observed[::2, ::2].reshape(-1, 3)[keep])
+        if sum(len(x) for x in xs) < 500:
+            raise ValueError("the camera did not see the colour patterns")
         self.colour_map = _robust_fit(np.concatenate(xs), np.concatenate(ys), pull=CALIBRATION_PULL)
         self._cache = {}
 

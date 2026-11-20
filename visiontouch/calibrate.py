@@ -34,13 +34,14 @@ def find_homography(camera_image, corners):
     parameters = cv2.aruco.DetectorParameters()
     parameters.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
     found, ids, _ = cv2.aruco.ArucoDetector(DICTIONARY, parameters).detectMarkers(gray)
-    if ids is None or len(ids) < 4:
-        return None, float("inf"), 0 if ids is None else len(ids)
-    camera = np.concatenate([c.reshape(4, 2) for c in found])
-    screen = np.concatenate([corners[int(i)] for i in ids.ravel()])
+    known = [] if ids is None else [k for k, i in enumerate(ids.ravel()) if int(i) in corners]  # only our own markers
+    if len(known) < 4:
+        return None, float("inf"), len(known)
+    camera = np.concatenate([found[k].reshape(4, 2) for k in known])
+    screen = np.concatenate([corners[int(ids.ravel()[k])] for k in known])
     H, inliers = cv2.findHomography(camera, screen, cv2.RANSAC, 4.0)
     if H is None:
-        return None, float("inf"), len(ids)
+        return None, float("inf"), len(known)
     keep = inliers.ravel() == 1
     projected = cv2.perspectiveTransform(camera[keep][None], H)[0]
     error = float(np.sqrt(np.mean(np.sum((projected - screen[keep]) ** 2, axis=1))))
@@ -56,8 +57,8 @@ def colour_tiles(w, h, seed):
     greys = rng.integers(0, 256, (9, 16, 1))
     colours = np.where(rng.random((9, 16, 1)) < 0.25, greys, colours)
     corners = [(b, g, r) for b in (0, 255) for g in (0, 255) for r in (0, 255)]  # the extremes, always present
-    for (y, x), colour in zip(rng.permutation(9 * 16)[:8].reshape(-1, 1) // [16, 1] % [9, 16], corners):
-        colours[y, x] = colour
+    for place, colour in zip(rng.permutation(9 * 16)[:8], corners):
+        colours[divmod(int(place), 16)] = colour
     return cv2.resize(colours.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
 
 
