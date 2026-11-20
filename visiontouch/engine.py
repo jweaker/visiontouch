@@ -27,6 +27,7 @@ from .track import Tracker
 STORE = Path(os.environ.get("VISIONTOUCH_HOME", Path.home() / ".visiontouch"))  # calibration and logs
 MASK_GRID = (128, 72)
 STRIP = (420, 110)  # size of the stage window in desktop mode
+RECORD_FRAMES = 7200  # a recording stops by itself after this many frames (four minutes): it saves the whole screen
 
 
 def _apply(matrix, point):
@@ -43,6 +44,7 @@ class Engine:
         self.landmarker = Landmarker() if landmarks else None
         self._helper = ThreadPoolExecutor(1)  # the hand model looks at a frame while the main thread works out its mask
         self._busy = (True, True)  # was anything in front of the left, the right half of the picture last frame?
+        self._missed = 0  # frames in a row in which the hand model did not see every known hand
         self.mode, self.mask_wanted, self.message = "apps", False, ""
         self.fps, self.latency, self.predictor = 0.0, 0.2, None
         self.mouse = None
@@ -226,6 +228,8 @@ class Engine:
         frames.append({"time": when, "screen": name, "screen_id": id(screen)})
         if len(frames) % 30 == 0:
             (folder / "index.json").write_text(json.dumps({"camera": self.source, "screen_size": self.screen.size, "frames": frames}))
+        if len(frames) >= RECORD_FRAMES:
+            self._recording = None
 
     # --- per frame ---
 
@@ -243,7 +247,7 @@ class Engine:
         if self._recording:
             self._record(frame, when, screen)
         p = self.predictor
-        looking = self._helper.submit(self._look, frame) if self.landmarker else None
+        looking = self._helper.submit(self._look, frame, when) if self.landmarker else None
         residual, predicted, observed = p.residual(screen, frame, others or (), self.blind)
         mask, labels, blobs = clean_mask(residual, self.sensitivity)
         # If most of the picture disagrees with the prediction for seconds on
@@ -278,16 +282,17 @@ class Engine:
             self._publish_debug(p, observed, predicted, residual, mask, pointers, drawn)
         return pointers
 
-    def _look(self, frame):
-        """Run the hand model on one frame: closely where each known hand was a
-        moment ago, and taking turns over the left and the right half of the
-        picture for new ones (all the time while no hand is known, now and
-        then otherwise). Returns the known hands' places (working pixels) and
-        the landmarks of every hand seen (camera pixels)."""
+    def _look(self, frame, when):
+        """Run the hand model on one frame: closely where each known hand
+        should be by now, and taking turns over the left and the right half
+        of the picture for new ones (all the time while a hand is missing,
+        now and then otherwise). Returns the known hands' last places (working
+        pixels) and the landmarks of every hand seen (camera pixels)."""
         p = self.predictor
-        known = [_apply(p.screen_to_work, self._to_screen({"x": x, "y": y})) for x, y in (t.filter.state[:2] for t in self.tracker.pointers)]
-        looks = [(_apply(p.work_to_cam, centre), 0.13 * p.span) for centre in known]
-        turn = self._count % (10 if known else 2)
+        to_work = lambda xy: _apply(p.screen_to_work, self._to_screen({"x": xy[0], "y": xy[1]}))
+        known = [to_work(t.filter.state) for t in self.tracker.pointers]
+        looks = [(_apply(p.work_to_cam, to_work(t.filter.ahead(when - t.seen))), 0.13 * p.span) for t in self.tracker.pointers]
+        turn = self._count % (10 if known and self._missed < 2 else 2)
         if turn < 2 and self._busy[turn]:  # nothing in front of the picture: nothing to search
             looks.append((_apply(p.work_to_cam, ((turn + 0.5) * p.size[0] / 2, p.size[1] / 2)), 0.28 * p.span))
         return known, [points for look in looks for points in self.landmarker.detect(frame, *look)]
@@ -310,7 +315,9 @@ class Engine:
                 found.append((spot, points))
         detections = [{"pos": self._to_content(_apply(p.cam_to_screen @ p.work_to_cam, spot)), "pose": read_pose(points) if points is not None else None,
                        "hand": points is not None} for spot, points in found]
-        return detections, [points for _, points in found if points is not None]
+        drawn = [points for _, points in found if points is not None]
+        self._missed = self._missed + 1 if len(drawn) < len(known) else 0
+        return detections, drawn
 
     def _publish_debug(self, p, observed, predicted, residual, mask, pointers, landmarks):
         view = observed.clip(0, 255).astype(np.uint8)
