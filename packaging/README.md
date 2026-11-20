@@ -68,6 +68,6 @@ $process.ExitCode
 
 ## Releases and verification
 
-Push a `v*` tag to run all three builds and publish a GitHub Release with the archives. The only release so far is `v0.1.5`. Pull requests and manual dispatch run the build and upload job artifacts without publishing a release. Each file keeps the name in the table, so it can be downloaded at `https://github.com/<owner>/<repo>/releases/latest/download/<archive>`. Private repositories require repository access to download assets.
+Push a `v*` tag to run all three builds and publish a GitHub Release with the archives.. Pull requests and manual dispatch run the build and upload job artifacts without publishing a release. Each file keeps the name in the table, so it can be downloaded at `https://github.com/<owner>/<repo>/releases/latest/download/<archive>`. Private repositories require repository access to download assets.
 
 Before freezing, CI also runs `tests/test_simulated_rig.py` and the self-checks of the engine modules. Verification for the Windows and Linux packages is otherwise limited to CI's headless self-check (`--check`). Neither package has been run against a real projector and camera. The macOS bundle has been checked headlessly on Apple silicon. Normal launch, permission dialogs, and hardware use still need a separate test. OpenCV and PyAV ship separate copies of FFmpeg on macOS, so loading both can emit duplicate Objective-C class warnings. The headless check verifies decoder initialization. Android streaming and camera capture still need hardware verification.
