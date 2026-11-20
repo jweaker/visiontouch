@@ -161,8 +161,8 @@ How to read it: the colour map alone does not help, because the camera's exposur
 2. **Morphology.** An opening (3×3) removes single noisy pixels and thin lines left at edges. A closing (7×7) fills small holes inside the hand.
 3. **Connected components.** Every separate blob gets a label. Blobs smaller than 0.15 % of the image are dropped.
 4. **Thickness test.** A blob must be at least 7 pixels wide somewhere (`THICK`), tested with an erosion. An arm is wide; the leftovers along the coloured outlines of buttons are thin strips, and this removes them.
-5. Thin parts attached to a kept blob (a finger the opening removed) are grown back, up to 12 pixels.
-6. **Grouping.** Pieces closer than 25 pixels (`GAP`) count as one blob. Where the picture is dark, a hand or shadow leaves no trace, so an arm crossing a dark drawing would otherwise be cut in two and its fingertip half thrown away.
+5. **Grouping.** Pieces closer than 17 pixels (`GAP`) count as one blob, and a blob is kept if it contains at least one piece that passed the tests above. Where the picture is dark, a hand or shadow leaves no trace, so an arm reaching across the dark outline of a button is cut in two; grouping puts it back together.
+6. Thin parts attached to a kept blob (a finger the opening removed) are grown back, up to 12 pixels.
 
 **Why.** A single threshold forces a bad choice: low enough to catch a faint hand also catches noise; high enough to ignore noise also cuts off the faint fingertip. Hysteresis uses the high threshold to decide *whether* a blob is real and the low one to decide *how big* it is.
 
@@ -201,6 +201,8 @@ How to read it: the colour map alone does not help, because the camera's exposur
 | Webcam | 138 | 88 % | 12.1 | 0.63 % | 622 | 58 % |
 | Phone | 138 | 89 % | 10.1 | 0.52 % | 682 | 67 % |
 <!-- END fingertip -->
+
+**Two guards on the fingertip.** It is looked for only on parts of the blob at least 5 pixels wide (`SOLID`), and no further than 26 pixels (`FINGER`) from the hand's wide body. A thin leftover along a button's outline can touch the hand; without these guards it would drag the fingertip along the outline.
 
 ## 7. Hand pose with MediaPipe
 

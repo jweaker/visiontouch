@@ -14,7 +14,7 @@ VisionTouch turns an ordinary projector and an ordinary camera (a laptop webcam 
 <!-- BEGIN headline -->
 - **Webcam, recorded dataset (synthetic hands):** 6.1 % of clean pixels wrongly flagged (plain subtraction: 91.2 %); hand found in 88 % of frames; median fingertip error 12.1 px (0.63 % of the screen width).
 - **Phone, recorded dataset (synthetic hands):** 3.7 % of clean pixels wrongly flagged (plain subtraction: 97.5 %); hand found in 89 % of frames; median fingertip error 10.1 px (0.52 % of the screen width).
-- **Live rig, Webcam:** no false hand on the clean pictures; median pointer error within 20 px in 12 of 16 picture-and-hand cases; worst 73 px on `slide_light`.
+- **Live rig, Webcam:** no false hand on the clean pictures; median pointer error within 20 px in 12 of 14 picture-and-hand cases; worst 35 px on `slide_light`.
 - **Live rig, Webcam, washed-out picture:** no false hand on the clean pictures; median pointer error within 20 px in 10 of 13 picture-and-hand cases; worst 280 px on `text`.
 - **Live rig, Phone:** no false hand on the clean pictures; median pointer error within 20 px in 14 of 16 picture-and-hand cases; worst 79 px on `text`.
 - **Keystone (webcam):** edge tilt 5.3° before, 0.11° after; aspect 1.67 → 1.78 (target 1.78).
@@ -291,14 +291,14 @@ The engine calibrates itself, then the test projects each picture. First the cle
 <!-- BEGIN live -->
 | Camera | Picture | Clean: frames with a false hand | Shadow: frames with a pointer, median error | Lit hand: same |
 |---|---|---|---|---|
-| Webcam | white | 0 % | 91 %, 3 px | 92 %, 2 px |
-| Webcam | pastel | 0 % | 91 %, 2 px | 93 %, 3 px |
-| Webcam | light | 0 % | 91 %, 8 px | 92 %, 1 px |
-| Webcam | board | 0 % | 92 %, 6 px | 92 %, 2 px |
-| Webcam | balloons | 0 % | 92 %, 28 px | 92 %, 3 px |
-| Webcam | slide_light | 0 % | 92 %, 73 px | 92 %, 5 px |
-| Webcam | text | 0 % | 31 %, 70 px | 31 %, 21 px |
-| Webcam | mid | 0 % | 91 %, 13 px | 91 %, 4 px |
+| Webcam | white | 0 % | 87 %, 3 px | 87 %, 2 px |
+| Webcam | pastel | 0 % | 86 %, 2 px | 87 %, 2 px |
+| Webcam | light | 0 % | 85 %, 2 px | 88 %, 5 px |
+| Webcam | board | 0 % | 86 %, 27 px | 89 %, 5 px |
+| Webcam | balloons | 0 % | 87 %, 4 px | 89 %, 2 px |
+| Webcam | slide_light | 0 % | 88 %, 35 px | 88 %, 6 px |
+| Webcam | text | 0 % | 0 %, – | 0 %, – |
+| Webcam | mid | 0 % | 89 %, 3 px | 86 %, 1 px |
 | Webcam, washed-out picture | white | 0 % | 90 %, 154 px | 0 %, – |
 | Webcam, washed-out picture | pastel | 0 % | 90 %, 2 px | 30 %, 15 px |
 | Webcam, washed-out picture | light | 0 % | 91 %, 1 px | 89 %, 2 px |
@@ -345,7 +345,7 @@ The live tests count pointers after the tracker, which reports a hand only after
 <!-- BEGIN latency -->
 | Camera | Camera + projector delay (calibration) | Engine step, live (median) | Residual only, offline (median) |
 |---|---|---|---|
-| Webcam | 184 ms | 37 ms | 21 ms |
+| Webcam | 281 ms | 51 ms | 21 ms |
 | Webcam, washed-out picture | 219 ms | 38 ms | – |
 | Phone | 165 ms | 41 ms | 24 ms |
 <!-- END latency -->

@@ -17,6 +17,7 @@ MIN_AREA = 0.0015  # smallest blob, as a fraction of the working image
 GAP = 17  # pieces closer than this (working pixels) count as one blob
 THICK = 7  # a blob must be at least this wide somewhere (working pixels)
 SOLID = 5  # parts of a blob narrower than this (working pixels) cannot be the fingertip
+PALM, FINGER = 9, 26  # the hand's body is at least PALM wide; a finger reaches at most FINGER beyond it
 MODEL = Path(__file__).parent / "models" / "hand_landmarker.task"
 
 
@@ -64,7 +65,12 @@ def find_tips(labels, blobs, inside):
     # The tip is looked for on the solid part of the blob only. A finger is
     # several pixels wide; a thin line stuck to it (the app's own cursor ring,
     # the outline of a button) is not, and must not pull the tip away.
-    solid = cv2.morphologyEx((labels > 0).astype(np.uint8), cv2.MORPH_OPEN, np.ones((SOLID, SOLID), np.uint8)) > 0
+    mask = (labels > 0).astype(np.uint8)
+    solid = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((SOLID, SOLID), np.uint8)) > 0
+    # A finger is short. Anything thin that runs on far from the wide body of
+    # the hand is something else that happens to touch it (a button's outline).
+    body = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((PALM, PALM), np.uint8))
+    solid &= cv2.dilate(body, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * FINGER + 1, 2 * FINGER + 1))) > 0
     hands = []
     for label in blobs:
         ys, xs = np.nonzero(labels == label)
