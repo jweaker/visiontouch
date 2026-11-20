@@ -81,7 +81,7 @@ describe('dwell ring', () => {
 
   it('fills while a pointing hand holds still, resets when it moves, empties after the click', () => {
     handlePointers([hand(1, 0.5, false)], 0)
-    handlePointers([hand(1, 0.51, false)], 400) // within 2.5 %
+    handlePointers([hand(1, 0.51, false)], 400) // within 4 %
     expect(dwell()).toBeCloseTo(0.5)
     handlePointers([hand(1, 0.56, false)], 500) // moved too far: start over
     expect(dwell()).toBe(0)
@@ -90,12 +90,6 @@ describe('dwell ring', () => {
     handlePointers([hand(1, 0.56, false)], 1400) // 0.9 s: the engine clicks, the ring empties
     expect(dwell()).toBe(0)
     handlePointers([hand(1, 0.56, false)], 2000) // still there: no second click
-    expect(dwell()).toBe(0)
-  })
-
-  it('only pointing hands dwell', () => {
-    handlePointers([hand(1, 0.5, false, 'palm')], 0)
-    handlePointers([hand(1, 0.5, false, 'palm')], 600)
     expect(dwell()).toBe(0)
   })
 })

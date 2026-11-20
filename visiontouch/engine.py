@@ -10,6 +10,7 @@ import queue
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import cv2
@@ -40,6 +41,8 @@ class Engine:
         self.screen = screen or Screen()
         self.tracker = Tracker()
         self.landmarker = Landmarker() if landmarks else None
+        self._helper = ThreadPoolExecutor(1)  # the hand model looks at a frame while the main thread works out its mask
+        self._busy = (True, True)  # was anything in front of the left, the right half of the picture last frame?
         self.mode, self.mask_wanted, self.message = "apps", False, ""
         self.fps, self.latency, self.predictor = 0.0, 0.2, None
         self.mouse = None
@@ -240,6 +243,7 @@ class Engine:
         if self._recording:
             self._record(frame, when, screen)
         p = self.predictor
+        looking = self._helper.submit(self._look, frame) if self.landmarker else None
         residual, predicted, observed = p.residual(screen, frame, others or (), self.blind)
         mask, labels, blobs = clean_mask(residual, self.sensitivity)
         # If most of the picture disagrees with the prediction for seconds on
@@ -253,8 +257,8 @@ class Engine:
             (dx, dy), confidence = cv2.phaseCorrelate(grey[0], grey[1], cv2.createHanningWindow(p.size, cv2.CV_32F))
             self._drift = self._drift + 1 if confidence > 0.25 and np.hypot(dx, dy) > 2.5 else 0
 
-        if self.landmarker:
-            detections, drawn = self._find_hands(frame, mask)
+        if looking:
+            detections, drawn = self._find_hands(mask, *looking.result())
         else:
             tips, drawn = [_apply(p.work_to_cam, hand["tip"]) for hand in find_tips(labels, blobs, p.inside)], []
             detections = [{"pos": self._to_content(_apply(p.cam_to_screen, tip)), "pose": None} for tip in tips]
@@ -274,24 +278,31 @@ class Engine:
             self._publish_debug(p, observed, predicted, residual, mask, pointers, drawn)
         return pointers
 
-    def _find_hands(self, frame, mask):
-        """Detections for the tracker, and the landmarks seen (for the debug view).
+    def _look(self, frame):
+        """Run the hand model on one frame: closely where each known hand was a
+        moment ago, and taking turns over the left and the right half of the
+        picture for new ones (all the time while no hand is known, now and
+        then otherwise). Returns the known hands' places (working pixels) and
+        the landmarks of every hand seen (camera pixels)."""
+        p = self.predictor
+        known = [_apply(p.screen_to_work, self._to_screen({"x": x, "y": y})) for x, y in (t.filter.state[:2] for t in self.tracker.pointers)]
+        looks = [(_apply(p.work_to_cam, centre), 0.13 * p.span) for centre in known]
+        turn = self._count % (10 if known else 2)
+        if turn < 2 and self._busy[turn]:  # nothing in front of the picture: nothing to search
+            looks.append((_apply(p.work_to_cam, ((turn + 0.5) * p.size[0] / 2, p.size[1] / 2)), 0.28 * p.span))
+        return known, [points for look in looks for points in self.landmarker.detect(frame, *look)]
 
-        The hand model looks closely where each known hand was a moment ago,
-        and takes turns searching the left and the right half of the picture
-        for new ones (all the time while no hand is known, now and then
-        otherwise). The pointer is the index fingertip. The model misses a
+    def _find_hands(self, mask, known, seen):
+        """Detections for the tracker, and the landmarks kept (for the debug view).
+
+        The pointer is the index fingertip of a hand the model saw, if the
+        mask agrees that a hand can be pointing there. The model misses a
         small, far hand in about one frame out of four; while the mask still
         shows a pointing hand there, the pointer stays where it was."""
         p = self.predictor
         to_work, width = np.linalg.inv(p.work_to_cam), mask.shape[1]
+        self._busy = (mask[:, :width // 2].any(), mask[:, width // 2:].any())
         can_point = lambda spot: pointing(mask, spot, 0.02 * width, 0.3 * width)
-        known = [_apply(p.screen_to_work, self._to_screen({"x": x, "y": y})) for x, y in (t.filter.state[:2] for t in self.tracker.pointers)]
-        looks = [(_apply(p.work_to_cam, centre), 0.13 * p.span) for centre in known]
-        turn, half_width = self._count % (6 if known else 2), width // 2
-        if turn < 2 and mask[:, turn * half_width:(turn + 1) * half_width].any():  # nothing in front of the picture: nothing to search
-            looks.append((_apply(p.work_to_cam, ((turn + 0.5) * half_width, mask.shape[0] / 2)), 0.28 * p.span))
-        seen = [points for look in looks for points in self.landmarker.detect(frame, *look)]
         spots = [(_apply(to_work, points[8]), points) for points in seen] + [(centre, None) for centre in known]  # hands the model saw come first
         found = []
         for spot, points in spots:

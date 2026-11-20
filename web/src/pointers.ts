@@ -39,10 +39,10 @@ const POINTER_ID_BASE = 1000
 // fraction of the window width (hands jitter by 1-2 cm), within CLICK_MS.
 const CLICK_DIST = 0.04
 const CLICK_MS = 1500
-// Dwell click, mirrored from the engine (visiontouch/track.py): a pointing hand that stays within
+// Dwell click, mirrored from the engine (visiontouch/track.py): a hand that stays within
 // DWELL_RADIUS (normalised content units) for DWELL_MS gets one click from the engine. We only
 // draw the progress; the engine makes the click.
-const DWELL_RADIUS = 0.025
+const DWELL_RADIUS = 0.04
 const DWELL_MS = 800
 
 interface Track {
@@ -120,7 +120,7 @@ export function handlePointers(list: EnginePointer[], now = performance.now()) {
     if (Math.hypot(p.x - t.anchorX, p.y - t.anchorY) > DWELL_RADIUS)
       Object.assign(t, { anchorX: p.x, anchorY: p.y, anchorAt: now, armed: true })
     // (also while down: in the engine's "hold" dwell mode the next hold releases the press)
-    let dwell = t.armed && t.hand.pose === 'point' ? (now - t.anchorAt) / DWELL_MS : 0
+    let dwell = t.armed ? (now - t.anchorAt) / DWELL_MS : 0
     if (dwell >= 1) {
       t.armed = false // the engine clicks now; the ring empties until the hand moves on
       dwell = 0

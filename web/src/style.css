@@ -163,7 +163,7 @@ body.desktop #back {
   box-shadow: 0 0 0 0.2rem #fff, inset 0 0 0 0.2rem #fff; /* white halo: visible on any colour */
   /* dwell click progress: fills clockwise while a pointing hand holds still (pointers.ts) */
   background: conic-gradient(var(--sun) calc(var(--dwell, 0) * 1turn), transparent 0);
-  transition: transform 50ms linear, width 0.1s, height 0.1s, margin 0.1s;
+  transition: transform 80ms linear, width 0.1s, height 0.1s, margin 0.1s;
 }
 .ring.down { background: var(--sun); width: 2.2rem; height: 2.2rem; margin: -1.1rem; }
 .ring.palm { width: 7rem; height: 7rem; margin: -3.5rem; border-style: dashed; border-color: var(--pink); }
