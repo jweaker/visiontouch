@@ -13,7 +13,7 @@ const PALM_ERASER = 160
 export const board: App = {
   id: 'board',
   title: 'Board',
-  blurb: 'Hold still or pinch to draw. Open your palm to erase.',
+  blurb: 'Hold still to start a line, and again to end it.',
   color: C.cobalt,
   icon: '<svg viewBox="0 0 64 64"><path d="M8 46c8-16 16-24 22-16s10 10 26-14"/><circle cx="12" cy="54" r="3"/></svg>',
 

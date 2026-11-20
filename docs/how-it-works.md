@@ -6,7 +6,9 @@ VisionTouch turns any projector into a touch board. A camera watches the project
 
 Each stage below says what it does, why it is needed, which lecture it belongs to, its main parameter, and what happens if you change that parameter. The figures are made by `eval/figures.py` from data recorded on our own rig. The tables between `BEGIN` and `END` marks are filled in by `eval/fill_report.py`, so do not edit them by hand.
 
-**Read this first: what our tests can and cannot show.** All hands in our tests so far are **synthetic**. We painted a hand shape (a black "shadow" or a skin-tinted "hand") into the projected picture and filmed it through the real projector and cameras. This tests the whole vision pipeline under real light, real lenses and real colour errors. It does **not** test real skin, real 3-D shadows, pinch detection on a real hand, or a person's body blocking the camera. The real-hand test (the Accuracy app) has not been run yet.
+**Read this first: what our tests can and cannot show.** The tables on this page come from **synthetic** hands unless they say otherwise. We painted a hand shape (a black "shadow" or a skin-tinted "hand") into the projected picture and filmed it through the real projector and cameras. This tests the vision pipeline under real light, real lenses and real colour errors. It does **not** test real skin, real 3-D shadows or a person standing in the picture.
+
+Real hands came later, and they changed the design. We recorded one person using the apps with the laptop camera, replayed the recordings through the engine, and found that our first fingertip rule failed as soon as a whole person stood in front of the screen. Sections 6 and 7 describe the method we use now and the first one, which stays in the program as the classical alternative. Real-hand numbers are few (one person, one camera, one room); the report gives them in section 4.6.
 
 ## Words used on this page
 
@@ -32,9 +34,10 @@ flowchart LR
     W --> P[Predict camera colours<br/>colour map, exposure, banding]
     P --> D[Compare: residual]
     D --> T[Threshold + morphology<br/>group pieces, thickness test]
-    T --> F[Fingertip:<br/>farthest solid point from the edge]
-    F --> M[MediaPipe on a crop:<br/>point, pinch, palm, fist]
-    M --> K[Kalman tracking<br/>dwell, pinch, swipe]
+    T --> M[MediaPipe where the mask<br/>shows something: 21 landmarks]
+    A --> M
+    M --> F[Can a hand point here?<br/>mask rule, index fingertip]
+    F --> K[Kalman tracking<br/>dwell, pinch, swipe]
     K --> O[Touch events in the apps<br/>or the OS mouse]
 ```
 
@@ -183,38 +186,35 @@ How to read it: the colour map alone does not help, because the camera's exposur
 
 ![Threshold sweep](figures/sweep.png)
 
-## 6. Fingertip
+## 6. Finding the hand and the fingertip
 
-**What it does** (`find_tips` in `hands.py`). An arm always enters the picture from an edge. So a blob counts as a hand only if at least 5 of its pixels lie in a thin band, about 4 working pixels wide, along the edge of the projected area (the area minus its 9×9 erosion). The entry point is the mean of the blob's pixels in that band. The fingertip is the mean of the 1 % of solid blob pixels (at least 3) farthest from the entry point. "Solid" is explained below.
+**What a real session looks like.** The person stands in front of the screen. The camera sees their head, body, both arms and their shadow, and the mask from stage 5 shows all of that as one big blob. Only one small part of the blob is the pointing hand.
 
-**Why.** It is simple, fast, and works for any hand shape that points away from the body. Islands in the middle of the screen (a flicker, a reflection) are ignored.
+**What it does** (`Engine._look` and `Engine._find_hands` in `engine.py`; `Landmarker` and `pointing` in `hands.py`). Two tools work together, and each covers the other's weakness.
 
-**Lecture.** Binary images and pixel distances (Euclidean distance between pixel coordinates). The rule itself is our own.
+1. **MediaPipe Hands finds hands.** It is a neural network from Google that marks 21 points (landmarks) on a hand. We never run it on the whole camera frame, because the hand is too small there. We cut squares out of the frame, enlarge each to 320×320 and run the model on that:
+   - *Search.* Two squares cover the left and the right half of the picture. The engine looks at one of them per frame, and only if the mask shows something in that half.
+   - *Follow.* Once a hand is known, a small square (a quarter of the picture's width across) is placed where the tracker expects the hand in this frame. In a small square the hand is large, so the model finds it more often.
 
-**Main parameter.** The edge band (set by the 9×9 erosion). If it is wider, false blobs near the edge count as arms; if narrower, an arm that enters at a slant may be missed.
+   The pointer is landmark 8, the **tip of the index finger**.
+2. **The mask decides whether a hand can be pointing there** (`pointing`). The model also finds hands we do not want: a hand resting on the chest, a hand holding a phone, sometimes a face. A pointing hand is at the end of an arm, so it lies at the **rim** of the blob. A head or a resting hand lies in the middle. The rule: take all mask pixels within 0.3 picture widths of the spot, and compute their centre and the radius of a disc with the same area. The spot counts only if it is on the mask and at least one radius (`OUT = 1.0`) away from that centre. On our recordings pointing hands scored 1.1 to 2.3 and a hand on the chest at most 0.7.
+3. **The mask also bridges the model's misses.** At the laptop camera's distance the hand is only about 60 camera pixels long, and the model misses it in about one frame out of four. In such a frame, if the mask still shows a pointing shape where the pointer was, the pointer stays there.
 
-![Fingertip error](figures/fingertip.png)
+The tracker keeps a running share of the frames in which the model really saw the hand. A pointer is shown once that share passes 25 % (about three sightings) and dropped when it falls below 8 %, so the mask alone can never create a pointer or keep one alive for long.
 
-<!-- BEGIN fingertip -->
-| Camera | Frames with a hand | Hand found | Median error (px) | Median (% of width) | 90th percentile (px) | Found tips within 20 px |
-|---|---|---|---|---|---|---|
-| Webcam | 138 | 88 % | 12.1 | 0.63 % | 622 | 58 % |
-| Phone | 138 | 89 % | 10.1 | 0.52 % | 682 | 67 % |
-<!-- END fingertip -->
+**Why.** The mask knows *where something is in front of the picture* very reliably, because it is measured against the known picture, but it cannot tell a fingertip from an elbow, a head or a shadow. The model knows *what a hand looks like*, but it is unreliable on small hands and it also fires on hands that are not pointing. Used together, the model gives the position and the mask gives the permission.
 
-**Two guards on the fingertip.** It is looked for only on solid parts of the blob, at least 5 pixels wide (`SOLID`, found with an opening), and no further than 26 pixels (`FINGER`) from the hand's wide body (the parts at least 9 pixels wide, `PALM`). A thin leftover along a button's outline or the app's cursor ring can touch the hand; without these guards it would drag the fingertip along that line.
+**Why the model's fingertip and not the blob's.** We measured both on a hand held still: the landmark moved 5 to 12 screen pixels from frame to frame, the outermost point of the blob 25 to 60, because the shadow and the cursor ring keep changing the blob's outline.
 
-## 7. Hand pose with MediaPipe
+**Poses.** Simple rules on the landmarks give the pose: thumb tip near index tip = **pinch**, all four fingers stretched = **palm**, none stretched = **fist**, otherwise **point**. Poses are read only if the hand is at least 45 camera pixels from wrist to knuckle (`POSE_SIZE`). On a smaller hand the landmarks wobble by about as much as a thumb and a finger are apart, and the pose would flicker and click by accident. With the laptop camera in our room the hand is about 26 pixels, so pinch and palm are switched off and clicks are made by holding still. A closer or sharper camera (a phone near the screen) brings them back.
 
-**What it does.** MediaPipe Hands is a neural network from Google that finds 21 points (landmarks) on a hand. We do not run it on the whole frame. We cut a square around the fingertip, moved a little towards the arm, about a quarter of the picture's width across, enlarge it to 320×320, and run MediaPipe on that crop (`Landmarker` in `hands.py`). Where the square sticks out of the camera frame, the edge pixels are repeated, so the crop stays square and the hand is not stretched. We believe the landmarks only if one of them lies within 0.3 × the crop's half-width of the blob's fingertip: the hand they describe must end where the blob ends, or the model has imagined a hand on the background. Simple rules on the landmarks give the pose: thumb tip near index tip = **pinch**, all four fingers stretched = **palm**, none stretched = **fist**, otherwise **point**.
+**Lecture.** The model is beyond the lectures (a convolutional neural network). The crop is ordinary cropping and resizing (sampling). The mask rule uses the centroid and area of a binary region (image moments) and Euclidean distance; the rule itself is our own.
 
-**Why.** The classical pipeline finds *where* something is, but not *what* the hand is doing. Pinch is our click; an open palm is the eraser.
+**Main parameters.** Size of the follow square (`0.13 × picture width`, half-size): bigger gives more context but a smaller hand in the 320×320 input. `OUT`: higher rejects more resting hands but also a hand held close to the body.
 
-**Lecture.** Beyond the lectures (a learned model, a convolutional neural network). The crop is ordinary image cropping and resizing (sampling).
+**Speed.** The model needs about 24 ms per square and the prediction of stages 4 and 5 about as long. They run at the same time on two threads, so a frame costs the longer of the two instead of their sum. The engine keeps the camera's 30 frames per second with nobody in the picture, and ran at 21 to 28 with a person in it.
 
-**Main parameter.** Crop size (`0.13 × picture width`, half-size) and confidence (0.3). A bigger crop gives more context but makes the hand smaller in the 320×320 input.
-
-**What we can say so far.** On our synthetic hands MediaPipe almost never fires, which is expected: they are flat paintings, not hands. This does not tell us how well it works on real hands; that waits for the real-hand test.
+**What we can say about MediaPipe on synthetic hands.** It almost never fires on them, which is expected: they are flat paintings, not hands. That is why the synthetic tables below belong to the classical rule, and why this stage could only be developed on real recordings.
 
 ![MediaPipe on synthetic hands](figures/mediapipe.png)
 
@@ -229,12 +229,35 @@ How to read it: the colour map alone does not help, because the camera's exposur
 Time per call on this laptop (median): Webcam: whole frame 13 ms, crop 13 ms; Phone: whole frame 13 ms, crop 13 ms.
 <!-- END mediapipe -->
 
+## 7. The classical fingertip rule (the alternative method)
+
+**What it does** (`find_tips` in `hands.py`; start the app with `--no-landmarks` to use it). This was our first method and needs no neural network. An arm always enters the picture from an edge. So a blob counts as a hand only if at least 5 of its pixels lie in a thin band, about 4 working pixels wide, along the edge of the projected area (the area minus its 9×9 erosion). The entry point is the mean of the blob's pixels in that band. The fingertip is the mean of the 1 % of solid blob pixels (at least 3) farthest from the entry point.
+
+**Two guards on the fingertip.** It is looked for only on solid parts of the blob, at least 5 pixels wide (`SOLID`, found with an opening), and no further than 26 pixels (`FINGER`) from the hand's wide body (the parts at least 9 pixels wide, `PALM`). A thin leftover along a button's outline or the app's cursor ring can touch the hand; without these guards it would drag the fingertip along that line.
+
+**Why it is not the default.** It assumes a bare arm reaching in from the side. With a person in the picture, the blob that enters from the edge is their whole body, and the point farthest from the entry is usually the head. On our real recordings the pointer sat on the head or jumped between head and hand.
+
+**Why we keep it.** It is simple, fast, fully explainable with lecture material, and it is the method all our synthetic-hand measurements were made with.
+
+**Lecture.** Binary images and pixel distances (Euclidean distance between pixel coordinates). The rule itself is our own.
+
+**Main parameter.** The edge band (set by the 9×9 erosion). If it is wider, false blobs near the edge count as arms; if narrower, an arm that enters at a slant may be missed.
+
+![Fingertip error](figures/fingertip.png)
+
+<!-- BEGIN fingertip -->
+| Camera | Frames with a hand | Hand found | Median error (px) | Median (% of width) | 90th percentile (px) | Found tips within 20 px |
+|---|---|---|---|---|---|---|
+| Webcam | 138 | 88 % | 12.1 | 0.63 % | 622 | 58 % |
+| Phone | 138 | 89 % | 10.1 | 0.52 % | 682 | 67 % |
+<!-- END fingertip -->
+
 ## 8. Tracking, clicks and swipes
 
-**What it does** (`track.py`). Each hand gets a Kalman filter that tracks its position and speed. Each new fingertip measurement is blended with the filter's prediction, so jitter is smoothed. The filter also predicts 60 ms ahead (`LEAD`) to hide part of the camera delay. A new pointer is reported only after 3 detections in a row (`CONFIRM`), which removes one-frame flickers. A pointer is dropped after 0.3 s without a detection. A pose (point, pinch, ...) must be seen in 2 frames in a row before it replaces the old one, because landmark poses flicker.
+**What it does** (`track.py`). Each hand gets a Kalman filter that tracks its position and speed. Each new fingertip measurement is blended with the filter's prediction, so jitter is smoothed. The filter also predicts 60 ms ahead (`LEAD`) to hide part of the camera delay. A new pointer is reported only after 3 detections in a row (`CONFIRM`), which removes one-frame flickers. A pointer is dropped after 0.3 s without a detection. A pose (point, pinch, ...) must be seen in 3 frames in a row before it replaces the old one, because landmark poses flicker.
 
-- **Click by dwell**: hold the pointing finger still (within 2.5 % of the screen width) for 0.8 s.
-- **Click by pinch**: the pinch pose holds the button down.
+- **Click by dwell**: hold the hand still (within 4 % of the screen width, because a raised hand wobbles) for 0.8 s. It works in any pose. The cursor ring fills up while you wait.
+- **Click by pinch**: the pinch pose holds the button down. Only when the hand is large enough in the camera for poses to be read (section 6).
 - **Hold mode** (protocol command `dwell` set to `hold`): the first hold presses and stays pressed while the finger moves, the next hold releases. This lets you draw without pinching. The Board asks for it while the hand is over the drawing area and goes back to ordinary taps over its toolbar and when it closes.
 - **Home and balloons need no press.** In the apps, a hand that points at the home button for one second goes home, and a hand that touches a balloon pops it. A dwell tap is too short to count as a one-second hold, and not every hand can pinch.
 - **Swipe**: move 30 % of the screen width sideways within 0.5 s (used by the Slides app).
@@ -258,10 +281,10 @@ Time per call on this laptop (median): Webcam: whole frame 13 ms, crop 13 ms; Ph
 <!-- BEGIN keystone -->
 |  | Edge tilt | Aspect ratio (target 1.78) | Markers found |
 |---|---|---|---|
-| Before | 5.30° | 1.666 | 53 |
-| After | 0.11° | 1.778 | 53 |
+| Before | 5.13° | 1.667 | 49 |
+| After | 0.08° | 1.777 | 47 |
 
-Pointer error inside the corrected picture (synthetic shadow): median 3.1 px over 83 frames.
+Pointer error inside the corrected picture (synthetic shadow): median 2.7 px over 64 frames.
 <!-- END keystone -->
 
 ## 10. Output
@@ -290,14 +313,19 @@ The engine sends pointer positions about 30 times a second to the web front end,
 - **Photos and the desktop screenshot.** Fine detail (leaves, small icons) everywhere. In the failure figure below, the residual (panel 4) is high all over the textured areas, not only on the hand: at fine detail, small errors in position, blur and colour are larger than the 5×5 tolerance forgives. Clean frames then get false blobs. When a false blob joins the hand's blob, the "farthest point" lands in the wrong place, which is why the median tip error is large for this class.
 - **Dark content.** A shadow on black is still black: there is no projected light to take away, so a hand on a black area is invisible to this method (the `black` picture). Dark slides also give false blobs; we have not isolated why.
 - **Text.** Inside the hand, black text stays black (a dark pixel stays dark whether or not a hand is in front of it), so the hand's blob has holes along every text line (panel 4 of the figure at the top of this page). On the live rig, the dense `text` page breaks the blob up so much that the pointer is often missing or wrong.
-- **Not tested yet:** real skin, a real 3-D shadow that falls apart from the hand, pinch on a real hand, and a person whose body blocks the camera's view.
+- **A hand in front of your own body.** The camera stands behind the user. A hand held in front of the chest is hidden from it, or looks like a resting hand and is refused by the rim rule. Reach sideways or upwards.
+- **A small, far hand.** With the laptop camera the hand is about 26 pixels long: the model misses it in about a quarter of the frames, pinch and palm are switched off, and a fast-moving (blurred) hand can be lost for a moment.
+- **Delay.** Projector and camera together add about 0.2 s between a movement and the cursor's answer. The tracker's prediction hides only part of it.
+- **Not tested yet:** more than one person, other rooms and projectors, pinch and palm on a real hand, and the phone camera with real hands.
 
 ![Failure case](figures/pipeline_failure.png)
 
 ## Likely examiner questions
 
 **Why not just run MediaPipe on the raw camera frame?**
-Three reasons. (1) MediaPipe finds *hands*, not *touches*: it cannot tell a real hand from a hand that is part of the projected picture (a photo on a slide), while subtraction ignores everything the computer itself is showing. (2) The projector paints the picture onto the hand, so the hand has strange colours and low contrast; the model card warns that it was not tested in unusual conditions such as low light (reference [33]), and we expect projected light to be similarly unfamiliar. (3) In a full camera frame the hand is small; a crop around the fingertip makes it big. We measured that a crop is not faster (the model resizes its input anyway), so the reason is accuracy, not speed. On our synthetic hands MediaPipe almost never fires, but they are not real hands, so the fair comparison waits for the real-hand test.
+Three reasons. (1) MediaPipe finds *hands*, not *touches*: it cannot tell a real hand from a hand that is part of the projected picture (a photo on a slide), and it also reports hands that are not pointing at anything. The mask ignores everything the computer itself is showing, and the rim rule refuses a resting hand. (2) In the full camera frame the hand is too small: on our recordings the model found it in 74 % of looks at a square half as wide as the projected picture, in 48 % at three quarters of its width, and in 10 % at its full width. So we cut squares, and only where the mask shows something. (3) The projector paints the picture onto the hand, so the hand has strange colours and low contrast; the model card warns that it was not tested in unusual conditions such as low light (reference [33]). That is why the engine does not depend on the model in every frame.
+
+**Then why not the classical rule alone?** We tried it first. It works for a bare arm and fails with a whole person in the picture (section 7).
 
 **What fails and why?** See the section above: photos and busy screens (false blobs), dark content (a shadow on black is invisible), dense text (the hand's blob breaks up).
 
@@ -311,8 +339,8 @@ Three reasons. (1) MediaPipe finds *hands*, not *touches*: it cannot tell a real
 
 **How did you choose the thresholds?** They were set during development. The ROC curve and the sweep on the recorded dataset check that choice: lower thresholds raise false alarms. The sweep also shows that on this dataset somewhat higher thresholds give fewer false alarms while still finding the hand about as often, so the choice is not optimal and is worth re-tuning once real-hand data exists.
 
-**How do you know the user touches the wall and is not just pointing in the air?** We do not. One camera cannot measure depth. Clicks are made by holding still or by pinching. Telling touch from hover from the shadow is future work (see `docs/related-work.md`, section 2).
+**How do you know the user touches the wall and is not just pointing in the air?** We do not. One camera cannot measure depth. Clicks are made by holding still (or by pinching, where the hand is large enough for poses). Telling touch from hover from the shadow is future work (see `docs/related-work.md`, section 2).
 
-**How fast is it?** See the latency table in the report. The largest part is the camera and projector delay, not our processing.
+**How fast is it?** The engine processes every camera frame (30 per second) with nobody in the picture and 21 to 28 with a person in it. The delay you feel is mostly the camera and the projector (about 0.2 s together), not our processing; see the latency table in the report.
 
-**Is the accuracy good enough?** On synthetic hands with good content, the median fingertip error is a fraction of a percent of the screen width. Real-hand accuracy is not yet measured.
+**Is the accuracy good enough?** On synthetic hands with good content, the median fingertip error is a fraction of a percent of the screen width. With a real hand in the Accuracy app (one person, laptop camera, 21 taps) the median error was 2.3 % of the screen width, about 44 pixels on a 1920-pixel picture: enough for tiles and buttons, not for small targets.

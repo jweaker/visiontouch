@@ -9,7 +9,7 @@ _Numbers generated 2026-11-20 01:51 from `runs/figures/results.json` and the rig
 
 ## Summary
 
-VisionTouch turns an ordinary projector and an ordinary camera (a laptop webcam or a phone) into a touch surface. The camera watches the projected picture. Because the computer knows what it is projecting, it can predict what the camera should see; whatever differs is a hand or its shadow. From that difference we find the fingertip, read the hand's pose, and send touches to our own apps or to the computer's mouse.
+VisionTouch turns an ordinary projector and an ordinary camera (a laptop webcam or a phone) into a touch surface. The camera watches the projected picture. Because the computer knows what it is projecting, it can predict what the camera should see; whatever differs is a hand or its shadow. A hand-landmark model then looks only where that difference shows something, the difference decides whether a hand found there can be pointing, and the index fingertip becomes a touch in our own apps or the computer's mouse.
 
 <!-- BEGIN headline -->
 - **Webcam, recorded dataset (synthetic hands):** 6.1 % of clean pixels wrongly flagged (plain subtraction: 91.2 %); hand found in 88 % of frames; median fingertip error 12.1 px (0.63 % of the screen width).
@@ -17,11 +17,11 @@ VisionTouch turns an ordinary projector and an ordinary camera (a laptop webcam 
 - **Live rig, Webcam:** no false hand on the clean pictures; median pointer error within 20 px in 12 of 14 picture-and-hand cases; worst 35 px on `slide_light`.
 - **Live rig, Webcam, washed-out picture:** no false hand on the clean pictures; median pointer error within 20 px in 10 of 13 picture-and-hand cases; worst 280 px on `text`.
 - **Live rig, Phone:** no false hand on the clean pictures; median pointer error within 20 px in 14 of 16 picture-and-hand cases; worst 79 px on `text`.
-- **Keystone (webcam):** edge tilt 5.3° before, 0.11° after; aspect 1.67 → 1.78 (target 1.78).
-- **Real hands:** not yet measured.
+- **Keystone (webcam):** edge tilt 5.1° before, 0.08° after; aspect 1.67 → 1.78 (target 1.78).
+- **Real hands:** median error 44.4 px (2.31 % of width) over 21 taps.
 <!-- END headline -->
 
-**Limits of the evidence.** Every hand in these tests is synthetic: a hand shape painted into the projected picture, filmed through the real projector and cameras. This measures the vision pipeline under real light and real optics, but not real skin, real 3-D shadows, pinch detection on a real hand, or a body blocking the camera. The real-hand accuracy test has not been run yet (section 4.6).
+**Limits of the evidence.** Except for the last line above, every hand in these tests is synthetic: a hand shape painted into the projected picture, filmed through the real projector and cameras. This measures the vision pipeline under real light and real optics, but not real skin, real 3-D shadows or a person standing in the picture. The synthetic fingertip numbers were made with the classical fingertip rule (section 3.8), which is no longer the default. Real-hand evidence is small: one person, the laptop camera, one room (sections 3.8 and 4.6).
 
 ---
 
@@ -89,8 +89,9 @@ flowchart TB
         F2[Screenshots from around<br/>the matching moment] --> F3[Warp to camera view] --> F4[Predict colours:<br/>colour map, exposure, row banding, shading]
         F4 --> F5[Residual against local min..max<br/>of all those screenshots]
         F5 --> F6[Hysteresis threshold, opening, closing,<br/>thickness test, grouping of nearby pieces]
-        F6 --> F7[Fingertip: farthest solid point<br/>from where the arm enters]
-        F7 --> F8[MediaPipe on a crop: pose]
+        F6 --> F7[MediaPipe on squares where the mask<br/>shows something: 21 landmarks]
+        F1 --> F7
+        F7 --> F8[Mask rule: can a hand point here?<br/>Pointer = index fingertip]
         F8 --> F9[Kalman tracker:<br/>dwell click, pinch, swipe]
         F9 --> F10[Pointer events or OS mouse]
     end
@@ -109,7 +110,7 @@ Each stage, its lecture topic and its main parameter are explained in [`how-it-w
 
 ### 3.1 From camera frame to fingertip
 
-The six panels are: the camera frame cropped to the projected area; the screenshot warped into the camera's view; the predicted camera image; the residual; the mask after thresholding and morphology; and the fingertip (white circle: truth, red cross: found, orange square: where the arm enters).
+The figures in this section were made with synthetic hands and the classical fingertip rule (section 3.8 explains the two rules). The six panels are: the camera frame cropped to the projected area; the screenshot warped into the camera's view; the predicted camera image; the residual; the mask after thresholding and morphology; and the fingertip (white circle: truth, red cross: found, orange square: where the arm enters).
 
 ![Pipeline, good case](figures/pipeline_good.png)
 
@@ -149,11 +150,39 @@ The camera frame is about 0.2 s old, and that delay varies by a few frames. So t
 <!-- BEGIN keystone -->
 |  | Edge tilt | Aspect ratio (target 1.78) | Markers found |
 |---|---|---|---|
-| Before | 5.30° | 1.666 | 53 |
-| After | 0.11° | 1.778 | 53 |
+| Before | 5.13° | 1.667 | 49 |
+| After | 0.08° | 1.777 | 47 |
 
-Pointer error inside the corrected picture (synthetic shadow): median 3.1 px over 83 frames.
+Pointer error inside the corrected picture (synthetic shadow): median 2.7 px over 64 frames.
 <!-- END keystone -->
+
+### 3.8 Finding the hand of a real person
+
+The first test with a real person showed what the synthetic hands could not. The person stands in front of the screen, so head, body, both arms and the shadow form one blob in the mask. Our first rule (`find_tips`: a hand is a blob that enters from the edge, the fingertip is its solid point farthest from the entry) then put the pointer on the head, or let it jump between head and hand. The hold-to-click ring almost never completed.
+
+We recorded two such sessions (camera frames and screenshots, `--record`), replayed them offline (`eval/replay.py`) and rebuilt the stage on them:
+
+| Step | What it does | Why |
+|---|---|---|
+| Search | MediaPipe Hands on a 320×320 enlargement of the left or the right half of the picture, one half per frame, only where the mask shows something | In the whole frame the hand is too small for the model |
+| Follow | The same model on a small square where the tracker expects the known hand | The hand is larger in a small square, so it is found more often |
+| Pointer | Landmark 8, the index fingertip | Steadier than the blob's outline: 5 to 12 px from frame to frame against 25 to 60 |
+| Rim rule | The spot must be on the mask and at least one "radius" from the centre of all mask pixels around it (radius of a disc with the same area) | A pointing hand is at the rim of the body's blob; a head or a hand on the chest is in the middle |
+| Bridging | If the model misses the hand in a frame but the mask still shows a pointing shape there, the pointer stays | The model misses a hand this small in about one frame out of four |
+| Poses | Read only if the hand is at least 45 camera pixels from wrist to knuckle | On a smaller hand pinch and palm flicker and click by accident |
+
+Replayed on the recordings (laptop camera, one person), with the old rule and the new one:
+
+| | Classical rule | Method now in use |
+|---|---|---|
+| Pointer present while the hand points at a button (270 frames) | about 50 % of frames | 98 % |
+| Pointer present in two other pointing stretches (170 and 93 frames) | – | 78 % and 85 % |
+| Frame-to-frame movement of a hand held still | 20 to 40 px | 2 to 7 px |
+| Pointer on the head while the person sits in view (about 4,000 frames) | appeared | never |
+
+These recordings were also used to design the method, so the numbers are development results, not an independent test. The classical rule remains in the program (`--no-landmarks`) as the alternative method.
+
+**Speed.** The same test showed the engine at about 6 frames per second whenever a hand was in view. Two causes: the hand model and the prediction ran one after the other, and the moving cursor ring made every screenshot new, so the whole prediction was redone for each. They now run on two threads, and a screenshot that differs from the last one in a few pixels reuses the rest. The prediction step went from 168 ms to 32 ms in that case. Live, the engine holds the camera's 30 frames per second with nobody in the picture and ran at 21 to 28 with a person in it.
 
 ---
 
@@ -367,10 +396,12 @@ The largest share of the delay is the camera and projector, measured at calibrat
 | Phone | 138 | 89 % | 10.1 | 0.52 % | 682 | 67 % |
 <!-- END fingertip -->
 
-**Real hands (Accuracy app):**
+**Real hands (Accuracy app).** One person, laptop camera, 20 targets on a 5×4 grid, clicks by holding still, plus one earlier tap. The session was run before the speed fix of section 3.8, so the time per target is pessimistic.
 
 <!-- BEGIN real_hands -->
-**Not yet measured.** The Accuracy app writes every tap to `~/.visiontouch/log.jsonl`; run `python -m eval.fill_report` after a session and this table fills in.
+| Taps | Sessions | Median error | Mean error | 90th percentile | Median time per target |
+|---|---|---|---|---|---|
+| 21 | 2 | 44.4 px (2.31 % of width) | 49.6 px | 74.8 px | 3.93 s |
 <!-- END real_hands -->
 
 ### 4.7 Classical versus learned
@@ -390,7 +421,13 @@ We ran MediaPipe Hands on the synthetic-hand frames: on the whole camera frame, 
 Time per call on this laptop (median): Webcam: whole frame 13 ms, crop 13 ms; Phone: whole frame 13 ms, crop 13 ms.
 <!-- END mediapipe -->
 
-MediaPipe almost never fires on the synthetic hands, which is expected: they are flat paintings without fingers' shading or knuckles. This shows only that the learned detector cannot replace the classical one *on this test*. A fair comparison needs real hands and will be done with the Accuracy app. Two points do not depend on that test: the classical pipeline ignores anything that is part of the projected picture (a photo of a hand on a slide), and MediaPipe is needed anyway for the pose (pinch, palm), which the classical pipeline cannot read.
+MediaPipe almost never fires on the synthetic hands, which is expected: they are flat paintings without fingers' shading or knuckles. So this table cannot compare the two approaches, and neither can any synthetic test.
+
+The comparison that counts came from real recordings (section 3.8), and its result is that neither approach works alone:
+
+- **The classical pipeline alone** knows very reliably *where* something is in front of the picture, and ignores anything that is part of the picture (a photo of a hand on a slide). It cannot tell a fingertip from a head or a shadow once a whole person is in view.
+- **The learned model alone** knows what a hand looks like, but in the full frame the hand is too small for it (found in 10 % of looks at the full picture width, 74 % at half), it misses a quarter of the frames even in a small square, and it also reports hands that are not pointing.
+- **Together:** the mask tells the model where to look and decides whether a hand found there can be pointing; the model gives the fingertip.
 
 ### 4.8 Strengths and weaknesses
 
@@ -407,15 +444,17 @@ MediaPipe almost never fires on the synthetic hands, which is expected: they are
 - Photos, busy desktops and dark content give false blobs and wrong fingertips.
 - Windows and Linux builds have not been run on real hardware (only a headless self-check in CI).
 - No true touch sensing: one camera cannot measure depth, so clicks use dwell or pinch.
+- A hand held in front of the user's own body is hidden from a camera behind them. The user must reach sideways or upwards.
+- With the laptop camera the hand is too small for poses: pinch and palm are off, and a fast (blurred) hand can be lost for a moment.
 - The camera and projector delay is large compared with what users notice on direct touch [51][53].
-- Not yet tested with real hands.
-- One hand pose model (MediaPipe) is a black box we did not train or evaluate on our setting.
+- Real-hand evidence is one person, one camera and one room; the recordings used to measure the hand finding were also used to design it.
+- The hand model (MediaPipe) is a black box we did not train.
 
 ---
 
 ## 5. Future work
 
-1. **Real-hand test** with the Accuracy app, several users, both cameras; then re-tune `LOW` and `HIGH` on that data.
+1. **A wider real-hand test** with the Accuracy app: several users, both cameras, more than one room; then re-tune `LOW` and `HIGH` on that data. A phone camera closer to the screen should make the hand large enough for pinch and palm.
 2. **Touch versus hover** from the finger's shadow, as PlayAnywhere does with infrared [13], adapted to visible light.
 3. **Separate hand from shadow** using colour: a shadow darkens all channels equally, skin does not (an untested idea in `related-work.md`, section 1).
 4. **Busy content:** a larger tolerance only where the screenshot has fine texture, or ignoring areas the predictor cannot explain on clean frames.

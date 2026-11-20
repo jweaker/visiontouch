@@ -1,6 +1,6 @@
 # VisionTouch: Smart Projector Board
 
-Turn any projector into a touch board with one ordinary camera: a laptop webcam, a phone, or a USB webcam. VisionTouch knows what it is projecting, predicts what the camera should see, and treats whatever differs as your hand. Point to move, hold still or pinch to click, open your palm to erase, swipe to change slides.
+Turn any projector into a touch board with one ordinary camera: a laptop webcam, a phone, or a USB webcam. VisionTouch knows what it is projecting, predicts what the camera should see, and looks for your hand only in whatever differs. Point to move, hold still to click, swipe to change slides. With a camera close enough to see your fingers clearly, pinch also clicks and an open palm erases.
 
 <!-- Hero picture: add a photo of the board in use here, e.g. ![VisionTouch in use](docs/figures/hero.jpg) -->
 
@@ -25,7 +25,7 @@ This opens the projected stage full-screen and starts the camera. Useful options
 | `--port 8766` | Port of the local stage server (default 8765). |
 | `--windowed` | Do not go full-screen. |
 | `--browser` | Show the stage in your web browser instead of the built-in window. |
-| `--no-landmarks` | Classical detection only, without MediaPipe (no pinch or palm). |
+| `--no-landmarks` | Classical detection only, without MediaPipe (no pinch or palm). It expects a bare arm reaching in from the side, not a person standing in the picture. |
 | `--record FOLDER` | Save the session (camera frames and screen pictures) so it can be replayed offline with `python -m eval.replay FOLDER`. |
 | `--check` | Check the installation without opening a window or camera. `--check-log FILE` writes the result to a file. |
 
@@ -52,7 +52,7 @@ Put the phone on a stand: it must not move after calibration.
 
 | App | What it does |
 |---|---|
-| Board | Draw with your finger (blue by default). Open your palm to erase. |
+| Board | Draw with your finger (blue by default): hold still to start a stroke and again to end it. Erase with the Eraser button or an open palm. |
 | Balloons | Touch balloons to pop as many as you can. |
 | Catch | Catch the stars, avoid the bombs. |
 | Slides | Present any PDF; swipe or tap the edges to change pages, draw on the page. |
@@ -69,17 +69,19 @@ Put the phone on a stand: it must not move after calibration.
 | Gesture | Action |
 |---|---|
 | Point with one finger | Move the pointer. |
-| Hold the finger still (about 0.8 s) | Click. |
+| Hold the hand still (about 0.8 s) | Click. The cursor ring fills up while you wait. |
 | On the Board: hold still, move, hold still again | Draw a stroke without pinching. |
-| Pinch thumb and index finger | Press (hold the pinch to drag). |
-| Open palm | Erase (Board). |
+| Pinch thumb and index finger | Press (hold the pinch to drag). Needs a large hand in the camera, see Limits. |
+| Open palm | Erase (Board). Needs a large hand in the camera, see Limits. |
 | Fast sideways swipe | Next or previous slide. |
 | Point at a balloon | Pops it. No press needed. |
 | Point at the home button for 1 s | Go home. No press needed. |
 
 ## Limits
 
-- **Measured on synthetic hands only, so far.** Our tests paint a hand shape into the projected picture and film it through the real projector and camera. Real skin, real 3-D shadows, pinch on a real hand and a body blocking the camera have not been measured yet. The real-hand test with the Accuracy app is still to be done.
+- **Mostly measured on synthetic hands.** Most tests paint a hand shape into the projected picture and film it through the real projector and camera. Real-hand results so far come from one person, one laptop camera and one room: a median error of 2.3 % of the screen width over 21 taps in the Accuracy app.
+- **Reach sideways or upwards.** The camera stands behind you, so it cannot see a hand held in front of your own body.
+- **Pinch and palm need a large hand in the camera.** With a laptop camera a few metres from the screen the hand is too small for its pose to be read reliably, so those two gestures switch themselves off and you click by holding still. A phone camera nearer the screen brings them back.
 - **Busy or dark content is hard.** Photos and cluttered desktops cause false detections; dense text breaks the hand's outline. Plain backgrounds, slides, drawings and games work best.
 - **A hand is invisible over anything dark.** No light falls on it there, so the camera sees no change. The apps are drawn to suit this: the cursor ring is bright with no dark outline, the Board draws in blue, game sprites are outlined in a darker shade of their own colour, and large areas are light tints.
 - **Windows and Linux are untested on real hardware.** Their builds have only passed the automated headless self-check. The macOS build has been checked headlessly on Apple silicon. See [packaging/README.md](packaging/README.md).
@@ -117,6 +119,6 @@ The tests in `tests/` need no hardware. `uv run python tests/test_simulated_rig.
 
 ## Licence
 
-MIT (licence file to be added by the team) — [Copyright holders: team names].
+MIT, see [LICENSE](LICENSE).
 
 The hand landmark model `visiontouch/models/hand_landmarker.task` is from Google's [MediaPipe](https://github.com/google-ai-edge/mediapipe) and is distributed under the Apache License 2.0. MediaPipe itself is also Apache-2.0.

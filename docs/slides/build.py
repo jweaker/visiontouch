@@ -83,7 +83,7 @@ def build():
     s = slide(deck, "VisionTouch: a smart projector board from one camera",
               "Introduce the team and the one-sentence idea: any projector plus any camera becomes a touch board, using only image processing. "
               "Say this is the Digital Image Processing course project and that we will follow the course phases: problem, data, method, results.")
-    text(s, Inches(0.6), Inches(2.0), Inches(12), Inches(1), "Point, hold or pinch to click, palm to erase, swipe for slides. No special hardware.", 26, MUTED)
+    text(s, Inches(0.6), Inches(2.0), Inches(12), Inches(1), "Point, hold still to click, swipe for slides. No special hardware.", 26, MUTED)
     text(s, Inches(0.6), Inches(4.6), Inches(12), Inches(2), ["Digital Image Processing, course project", "Team: " + ", ".join(TEAM)], 22, INK)
 
     # 2. Problem and idea
@@ -128,13 +128,16 @@ def build():
                     "The delay between screen and camera is only known roughly, so the engine compares with every screenshot shown within 0.15 s of the expected moment. "
                     "Lecture links: colour images and resolution (capture), point processing and intensity transformations (colour map, exposure), image subtraction (residual), "
                     "spatial filtering (local min and max), thresholding and binary images (mask), power-law gamma and smoothing (keystone). "
-                    "Beyond the lectures: homography, polynomial regression, Kalman filter, MediaPipe.")
+                    "Beyond the lectures: homography, polynomial regression, Kalman filter, MediaPipe. "
+                    "The hand step changed after the first real-hand test: a person standing in the picture is one big blob, and our first rule (the point farthest from where the arm enters) picked the head. "
+                    "Now MediaPipe looks only where the mask shows something, the pointer is its index fingertip, and the mask must agree that the spot is at the rim of the blob, at the end of an arm. "
+                    "The first rule is still in the program as the classical alternative (--no-landmarks), and the synthetic fingertip numbers were measured with it.")
     steps = [("Calibrate", "markers → homography\ncolour tiles → colour map", "beyond: homography,\nregression"),
              ("Predict", "warp screenshot,\nexposure, banding", "point processing,\nintensity transforms"),
              ("Subtract", "residual against local\nmin..max of nearby\nscreenshots", "image subtraction,\nspatial filtering"),
              ("Mask", "hysteresis threshold,\nopening, closing,\ngroup nearby pieces", "thresholding,\nbinary images"),
-             ("Fingertip", "farthest solid point\nfrom where the arm\nenters", "binary image\ngeometry"),
-             ("Pose + track", "MediaPipe on a crop,\nKalman filter", "beyond: CNN,\nKalman")]
+             ("Hand", "MediaPipe where the\nmask shows something;\nmask rule: at the rim?", "binary image\ngeometry; beyond: CNN"),
+             ("Track", "index fingertip,\nKalman filter,\nhold to click", "beyond:\nKalman")]
     for i, (name, what, lecture) in enumerate(steps):
         x = Inches(0.5 + i * 2.1)
         box = s.shapes.add_shape(1, x, Inches(2.0), Inches(1.95), Inches(1.0))
@@ -222,21 +225,22 @@ def build():
     fired = sum(m[c]["hand_full"]["fired"] for c in m) if m else None
     frames = sum(m[c]["hand_full"]["frames"] for c in m) if m else None
     s = slide(deck, "Honest limits, and what comes next", kicker="Conclusion",
-              notes="Say this plainly. Every hand so far is synthetic. We have not measured real skin, real 3-D shadows, pinch on a real hand, or a body blocking the camera. "
+              notes="Say this plainly. Almost every measured hand is synthetic. Real-hand evidence is one person, one laptop camera and one room. "
+                    "With that camera the hand is too small for poses, so pinch and palm are switched off and clicks are made by holding still. A hand in front of your own body is hidden from the camera. "
                     "The Windows and Linux builds have not been run on real hardware; only CI's headless self-check has passed. "
                     f"MediaPipe fired on {fired} of {frames} synthetic-hand frames on the whole image, which says nothing about real hands. "
                     "Real-hand accuracy: " + (f"median {real['median_error_px']:.0f} px over {real['taps']} taps." if real else "not yet measured; the Accuracy app logs every tap and the report fills in automatically.")
-                    + " Next: real-hand test, touch from the shadow, separating hand from shadow by colour, and lower delay.")
+                    + " Next: a wider real-hand test, touch from the shadow, separating hand from shadow by colour, and lower delay.")
     text(s, Inches(0.6), Inches(1.8), Inches(6.2), Inches(5.4), [
-        "All test hands so far are synthetic.",
-        "Not yet measured: real skin, 3-D shadows, pinch, body blocking the camera.",
+        "Almost all measured hands are synthetic.",
+        "Real hands: one person, one camera, one room.",
         "Real-hand accuracy: " + (f"median {real['median_error_px']:.0f} px" if real else "not yet measured."),
         "Photos, black areas and dense text fail.",
-        "No depth: a click is a pause or a pinch.",
+        "No depth: a click is a pause. Pinch and palm need a closer camera.",
         "Windows and Linux builds: headless self-check only."], 22)
     text(s, Inches(7.0), Inches(1.8), Inches(5.8), Inches(5.4), [
         "Next steps",
-        "Real-hand test with the Accuracy app",
+        "Wider real-hand test: more users, phone camera",
         "Touch versus hover from the finger's shadow",
         "Hand versus shadow by colour",
         "Re-tune thresholds on real hands",
